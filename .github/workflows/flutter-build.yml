@@ -81,21 +81,28 @@ jobs:
     - name: Build Web Preview
       run: |
         flutter config --enable-web
-        # Build web with base-href for GitHub Pages
-        flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+        # Build web with HTML renderer (miasa tsara kokoa)
+        flutter build web --release --web-renderer html --base-href "/${{ github.event.repository.name }}/"
       working-directory: ./snake_game
     
-    # Step 11: Verify web build
-    - name: Check Web Build
+    # Step 11: Fix web build for GitHub Pages
+    - name: Fix GitHub Pages deployment
       run: |
-        echo "Web build contents:"
+        # Manamarina ny build
+        echo "📦 Web build contents:"
         ls -la snake_game/build/web/
-        echo "---"
-        echo "Checking for main.dart.js:"
-        if [ -f snake_game/build/web/main.dart.js ]; then
-          echo "✓ main.dart.js found"
+        
+        # Mamorona .nojekyll (ilaina ho an'ny GitHub Pages)
+        touch snake_game/build/web/.nojekyll
+        
+        # Manamarina ny index.html
+        if [ -f snake_game/build/web/index.html ]; then
+          echo "✓ index.html found"
+          echo "First 10 lines of index.html:"
+          head -n 10 snake_game/build/web/index.html
         else
-          echo "✗ main.dart.js NOT found - Build may have failed"
+          echo "✗ index.html NOT found!"
+          exit 1
         fi
     
     # Step 11: Verify web build
