@@ -52,7 +52,7 @@ jobs:
     
     # 6. Build WEB (VAOVAO!)
     - name: Build Web
-      run: flutter build web --release --base-href "/game-snake/"
+      run: flutter build web --release --base-href "/gar/"
     
     # 7. Rename APK
     - name: Rename APK
