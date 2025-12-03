@@ -80,9 +80,10 @@ jobs:
         if [ -d assets/sounds ]; then
           echo "Copying sound files..."
           cp -r assets/sounds/* snake_game/assets/sounds/
+          echo "Sound files copied:"
           ls -la snake_game/assets/sounds/
         else
-          echo "Warning: assets/sounds folder not found"
+          echo "Warning: assets/sounds folder not found - game will work without audio"
         fi
     
     # Step 6.6: Update pubspec.yaml with assets (VAOVAO)
