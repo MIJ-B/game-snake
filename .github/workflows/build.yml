@@ -1,8 +1,10 @@
-name: Build and Release Flutter APK
+name: Build Flutter APK & Web
 
 on:
   push:
     branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -13,50 +15,71 @@ jobs:
       contents: write
     
     steps:
+    # 1. Checkout code
     - name: Checkout repository
       uses: actions/checkout@v4
     
+    # 2. Setup Java (ilaina ho an'ny Android build)
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
         java-version: '17'
     
+    # 3. Setup Flutter
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.24.0'
         channel: 'stable'
     
+    # 4. Get dependencies
     - name: Install dependencies
       run: flutter pub get
     
+    # 5. Analyze code (CHECK ERROR!)
     - name: Analyze code
       run: flutter analyze
     
+    # 6. Run tests
     - name: Run tests
       run: flutter test
       continue-on-error: true
     
+    # 7. Build APK (rehefa tsy misy error ihany)
     - name: Build APK
       run: flutter build apk --release
     
+    # 6. Build WEB (VAOVAO!)
     - name: Build Web
-      run: flutter build web --release --base-href "/gar/"
+      run: flutter build web --release --base-href "/game-snake/"
     
+    # 7. Rename APK
     - name: Rename APK
       run: |
         mv build/app/outputs/flutter-apk/app-release.apk \
            build/app/outputs/flutter-apk/snake-game-${{ github.run_number }}.apk
     
+    # 8. Upload APK
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: snake-game-apk
         path: build/app/outputs/flutter-apk/snake-game-*.apk
     
+    # 9. Deploy to GitHub Pages (PREVIEW ONLINE!)
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./build/web
+    
+    # 10. Create Release (raha misy tag)
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/app/outputs/flutter-apk/snake-game-*.apk
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
