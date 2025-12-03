@@ -68,12 +68,35 @@ jobs:
       working-directory: ./snake_game
       continue-on-error: true
     
-    # Step 10: Build APK
+    # Step 10: Build Web for Preview
+    - name: Build Web Preview
+      run: |
+        flutter config --enable-web
+        flutter build web --release
+      working-directory: ./snake_game
+    
+    # Step 11: Deploy to GitHub Pages for Preview
+    - name: Deploy Preview to GitHub Pages
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./snake_game/build/web
+        publish_branch: gh-pages
+    
+    # Step 12: Add preview URL comment
+    - name: Preview URL Info
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        echo "🌐 Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+        echo "Preview will be available in 1-2 minutes!"
+    
+    # Step 13: Build APK
     - name: Build APK
       run: flutter build apk --release
       working-directory: ./snake_game
     
-    # Step 11: Upload APK artifact
+    # Step 14: Upload APK artifact
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
@@ -81,12 +104,13 @@ jobs:
         path: snake_game/build/app/outputs/flutter-apk/app-release.apk
         retention-days: 30
     
-    # Step 12: Create release info
+    # Step 15: Create build info
     - name: Create build info
       run: |
         echo "Build completed successfully!" > build-info.txt
         echo "Build date: $(date)" >> build-info.txt
         echo "Flutter version: $(flutter --version | head -n 1)" >> build-info.txt
+        echo "Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> build-info.txt
     
     - name: Upload build info
       uses: actions/upload-artifact@v4
