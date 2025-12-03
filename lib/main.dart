@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
 
 void main() => runApp(SnakeApp());
 
@@ -9,7 +8,7 @@ class SnakeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Snake Game',
+      title: 'Snake Game 3D',
       theme: ThemeData(
         primarySwatch: Colors.green,
         brightness: Brightness.dark,
@@ -24,47 +23,49 @@ class SnakeGame extends StatefulWidget {
   _SnakeGameState createState() => _SnakeGameState();
 }
 
-class _SnakeGameState extends State<SnakeGame> {
+class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   static const int gridSize = 20;
   List<Offset> snake = [Offset(5, 5)];
   Offset food = Offset(10, 10);
   String direction = 'right';
-  String? nextDirection;
   bool isPlaying = false;
   int score = 0;
   int bestScore = 0;
   Timer? timer;
-  final AudioPlayer eatPlayer = AudioPlayer();
-  final AudioPlayer deathPlayer = AudioPlayer();
+  bool isEating = false;
+  AnimationController? eatingController;
+  AnimationController? bodyAnimController;
 
   @override
   void initState() {
     super.initState();
     generateFood();
+    
+    eatingController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 200),
+    );
+
+    bodyAnimController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 1500),
+    )..repeat();
   }
 
   void startGame() {
-    setState(() {
-      snake = [Offset(5, 5)];
-      direction = 'right';
-      nextDirection = null;
-      score = 0;
-      isPlaying = true;
-      generateFood();
-    });
+    snake = [Offset(5, 5)];
+    direction = 'right';
+    score = 0;
+    isPlaying = true;
+    generateFood();
 
     timer?.cancel();
-    timer = Timer.periodic(Duration(milliseconds: 150), (timer) {
+    timer = Timer.periodic(Duration(milliseconds: 200), (timer) {
       moveSnake();
     });
   }
 
   void moveSnake() {
-    if (nextDirection != null) {
-      direction = nextDirection!;
-      nextDirection = null;
-    }
-
     setState(() {
       Offset newHead = snake.first;
 
@@ -83,14 +84,12 @@ class _SnakeGameState extends State<SnakeGame> {
           break;
       }
 
-      // Check wall collision
       if (newHead.dx < 0 || newHead.dx >= gridSize || 
           newHead.dy < 0 || newHead.dy >= gridSize) {
         gameOver();
         return;
       }
 
-      // Check self collision
       if (snake.contains(newHead)) {
         gameOver();
         return;
@@ -98,10 +97,15 @@ class _SnakeGameState extends State<SnakeGame> {
 
       snake.insert(0, newHead);
 
-      // Check food collision
       if (newHead == food) {
         score += 10;
-        playEatSound();
+        isEating = true;
+        eatingController?.forward().then((_) {
+          eatingController?.reverse();
+          setState(() {
+            isEating = false;
+          });
+        });
         generateFood();
       } else {
         snake.removeLast();
@@ -119,37 +123,19 @@ class _SnakeGameState extends State<SnakeGame> {
       );
     } while (snake.contains(newFood));
 
-    setState(() {
-      food = newFood;
-    });
-  }
-
-  void playEatSound() async {
-    try {
-      await eatPlayer.play(AssetSource('sounds/eat.wav'));
-    } catch (e) {
-      print('Error playing eat sound: $e');
-    }
-  }
-
-  void playDeathSound() async {
-    try {
-      await deathPlayer.play(AssetSource('sounds/death.wav'));
-    } catch (e) {
-      print('Error playing death sound: $e');
-    }
+    food = newFood;
   }
 
   void gameOver() {
     timer?.cancel();
-    playDeathSound();
+    isPlaying = false;
     
-    setState(() {
-      isPlaying = false;
-      if (score > bestScore) {
+    // Update best score
+    if (score > bestScore) {
+      setState(() {
         bestScore = score;
-      }
-    });
+      });
+    }
     
     showDialog(
       context: context,
@@ -157,45 +143,255 @@ class _SnakeGameState extends State<SnakeGame> {
       builder: (context) => AlertDialog(
         backgroundColor: Colors.grey[900],
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Game Over!', 
-          style: TextStyle(
-            color: Colors.red, 
-            fontSize: 28, 
-            fontWeight: FontWeight.bold
-          ),
-          textAlign: TextAlign.center,
-        ),
+        title: Text('Game Over!', style: TextStyle(color: Colors.red, fontSize: 28, fontWeight: FontWeight.bold)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Score: $score', 
-              style: TextStyle(fontSize: 24, color: Colors.white)
-            ),
+            Text('Score: $score', style: TextStyle(fontSize: 24, color: Colors.white)),
             SizedBox(height: 10),
-            Text(
-              'Meilleur Score: $bestScore', 
-              style: TextStyle(fontSize: 20, color: Colors.amber)
-            ),
+            Text('Meilleur Score: $bestScore', style: TextStyle(fontSize: 20, color: Colors.amber)),
           ],
         ),
         actions: [
-          Center(
-            child: TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                startGame();
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              startGame();
+            },
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.green,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text('Hilalao indray', style: TextStyle(color: Colors.white, fontSize: 18)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    eatingController?.dispose();
+    bodyAnimController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[850],
+      appBar: AppBar(
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Snake 3D', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text('Score: $score', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        backgroundColor: Colors.green[800],
+        elevation: 10,
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(15),
+            color: Colors.grey[800],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.emoji_events, color: Colors.amber, size: 30),
+                SizedBox(width: 10),
+                Text('Meilleur Score: $bestScore', 
+                  style: TextStyle(fontSize: 20, color: Colors.amber, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onVerticalDragUpdate: (details) {
+                if (direction != 'up' && details.delta.dy > 0) {
+                  direction = 'down';
+                } else if (direction != 'down' && details.delta.dy < 0) {
+                  direction = 'up';
+                }
+              },
+              onHorizontalDragUpdate: (details) {
+                if (direction != 'left' && details.delta.dx > 0) {
+                  direction = 'right';
+                } else if (direction != 'right' && details.delta.dx < 0) {
+                  direction = 'left';
+                }
               },
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                margin: EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.3),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
                 ),
-                child: Text(
-                  'Hilalao indray', 
-                  style: TextStyle(color: Colors.white, fontSize: 18)
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: GridView.builder(
+                    physics: NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: gridSize,
+                    ),
+                    itemCount: gridSize * gridSize,
+                    itemBuilder: (context, index) {
+                      int x = index % gridSize;
+                      int y = index ~/ gridSize;
+                      Offset position = Offset(x.toDouble(), y.toDouble());
+
+                      bool isSnake = snake.contains(position);
+                      bool isFood = position == food;
+                      bool isHead = position == snake.first;
+                      bool isTail = snake.length > 1 && position == snake.last;
+                      
+                      int snakeIndex = snake.indexOf(position);
+                      bool isBody = isSnake && !isHead && !isTail;
+
+                      if (isHead) {
+                        return AnimatedBuilder(
+                          animation: eatingController!,
+                          builder: (context, child) {
+                            double scale = 1.0 + (eatingController!.value * 0.3);
+                            return Transform.scale(
+                              scale: scale,
+                              child: SnakeHead(direction: direction, isEating: isEating),
+                            );
+                          },
+                        );
+                      } else if (isBody) {
+                        return AnimatedBuilder(
+                          animation: bodyAnimController!,
+                          builder: (context, child) {
+                            double pulsePhase = (bodyAnimController!.value + (snakeIndex / snake.length)) % 1.0;
+                            double pulse = 0.95 + (sin(pulsePhase * 2 * pi) * 0.05);
+                            return Transform.scale(
+                              scale: pulse,
+                              child: SnakeBody(),
+                            );
+                          },
+                        );
+                      } else if (isTail) {
+                        return SnakeTail();
+                      } else if (isFood) {
+                        return FoodWidget();
+                      }
+
+                      return Container(
+                        margin: EdgeInsets.all(1),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[900],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (!isPlaying)
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: ElevatedButton(
+                onPressed: startGame,
+                child: Text('MANOMBOKA HILALAO', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                  backgroundColor: Colors.green[700],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  elevation: 10,
+                  shadowColor: Colors.green.withOpacity(0.5),
+                ),
+              ),
+            ),
+          SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
+
+class SnakeHead extends StatelessWidget {
+  final String direction;
+  final bool isEating;
+
+  SnakeHead({required this.direction, required this.isEating});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.all(1),
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          colors: [Colors.green[400]!, Colors.green[800]!],
+          center: Alignment(-0.3, -0.3),
+        ),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.6),
+            blurRadius: 8,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Maso
+          Positioned(
+            top: 3,
+            left: direction == 'right' ? 8 : direction == 'left' ? 2 : 3,
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: Colors.white, blurRadius: 2)],
+                  ),
+                ),
+                SizedBox(width: 2),
+                Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: Colors.white, blurRadius: 2)],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Vava
+          Positioned(
+            bottom: 3,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: isEating ? 10 : 6,
+                height: isEating ? 3 : 2,
+                decoration: BoxDecoration(
+                  color: Colors.red[700],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
@@ -204,315 +400,114 @@ class _SnakeGameState extends State<SnakeGame> {
       ),
     );
   }
+}
 
-  void changeDirection(String newDirection) {
-    // Prevent 180 degree turns
-    if ((direction == 'up' && newDirection == 'down') ||
-        (direction == 'down' && newDirection == 'up') ||
-        (direction == 'left' && newDirection == 'right') ||
-        (direction == 'right' && newDirection == 'left')) {
-      return;
-    }
-    nextDirection = newDirection;
+class SnakeBody extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.all(1.5),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green[600]!, Colors.green[700]!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.4),
+            blurRadius: 4,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Center(
+        child: Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: Colors.green[500]?.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ),
+    );
   }
+}
 
-  String getHeadSprite() {
-    return 'snake_asset/head_${direction}.png';
+class SnakeTail extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green[700]!, Colors.green[900]!],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.3),
+            blurRadius: 3,
+          ),
+        ],
+      ),
+    );
   }
+}
 
-  String getBodySprite(int index) {
-    if (index == snake.length - 1) {
-      // Tail
-      Offset current = snake[index];
-      Offset previous = snake[index - 1];
-      
-      if (previous.dx < current.dx) return 'snake_asset/tail_left.png';
-      if (previous.dx > current.dx) return 'snake_asset/tail_right.png';
-      if (previous.dy < current.dy) return 'snake_asset/tail_up.png';
-      return 'snake_asset/tail_down.png';
-    }
-    
-    // Body segments
-    Offset previous = index > 0 ? snake[index - 1] : snake[index];
-    Offset current = snake[index];
-    Offset next = index < snake.length - 1 ? snake[index + 1] : snake[index];
-    
-    bool horizontalBefore = previous.dy == current.dy;
-    bool horizontalAfter = next.dy == current.dy;
-    bool verticalBefore = previous.dx == current.dx;
-    bool verticalAfter = next.dx == current.dx;
-    
-    // Straight segments
-    if (horizontalBefore && horizontalAfter) {
-      return 'snake_asset/body_horizontal.png';
-    }
-    if (verticalBefore && verticalAfter) {
-      return 'snake_asset/body_vertical.png';
-    }
-    
-    // Corner segments
-    if ((previous.dx < current.dx && next.dy < current.dy) ||
-        (previous.dy < current.dy && next.dx < current.dx)) {
-      return 'snake_asset/body_topleft.png';
-    }
-    if ((previous.dx > current.dx && next.dy < current.dy) ||
-        (previous.dy < current.dy && next.dx > current.dx)) {
-      return 'snake_asset/body_topright.png';
-    }
-    if ((previous.dx < current.dx && next.dy > current.dy) ||
-        (previous.dy > current.dy && next.dx < current.dx)) {
-      return 'snake_asset/body_bottomleft.png';
-    }
-    if ((previous.dx > current.dx && next.dy > current.dy) ||
-        (previous.dy > current.dy && next.dx > current.dx)) {
-      return 'snake_asset/bodybottomright.png';
-    }
-    
-    return 'snake_asset/body_horizontal.png';
+class FoodWidget extends StatefulWidget {
+  @override
+  _FoodWidgetState createState() => _FoodWidgetState();
+}
+
+class _FoodWidgetState extends State<FoodWidget> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 800),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    timer?.cancel();
-    eatPlayer.dispose();
-    deathPlayer.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final isPortrait = screenSize.height > screenSize.width;
-    
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Score Bar
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              color: Colors.grey[900],
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.stars, color: Colors.amber, size: 24),
-                      SizedBox(width: 8),
-                      Text(
-                        'Score: $score',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Icon(Icons.emoji_events, color: Colors.amber, size: 24),
-                      SizedBox(width: 8),
-                      Text(
-                        'Best: $bestScore',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: 1.0 + (_controller.value * 0.2),
+          child: Container(
+            margin: EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [Colors.red[400]!, Colors.red[800]!],
+                center: Alignment(-0.3, -0.3),
               ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.red.withOpacity(0.8),
+                  blurRadius: 10,
+                  spreadRadius: 3,
+                ),
+              ],
             ),
-            
-            // Game Board
-            Expanded(
-              child: Center(
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: GestureDetector(
-                    onVerticalDragUpdate: (details) {
-                      if (!isPlaying) return;
-                      if (details.delta.dy > 5) {
-                        changeDirection('down');
-                      } else if (details.delta.dy < -5) {
-                        changeDirection('up');
-                      }
-                    },
-                    onHorizontalDragUpdate: (details) {
-                      if (!isPlaying) return;
-                      if (details.delta.dx > 5) {
-                        changeDirection('right');
-                      } else if (details.delta.dx < -5) {
-                        changeDirection('left');
-                      }
-                    },
-                    child: Container(
-                      margin: EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.green, width: 3),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(7),
-                        child: GridView.builder(
-                          physics: NeverScrollableScrollPhysics(),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: gridSize,
-                          ),
-                          itemCount: gridSize * gridSize,
-                          itemBuilder: (context, index) {
-                            int x = index % gridSize;
-                            int y = index ~/ gridSize;
-                            Offset position = Offset(x.toDouble(), y.toDouble());
-
-                            int snakeIndex = snake.indexOf(position);
-                            bool isSnake = snakeIndex != -1;
-                            bool isFood = position == food;
-                            bool isHead = position == snake.first;
-
-                            if (isHead) {
-                              return Container(
-                                margin: EdgeInsets.all(0.5),
-                                child: Image.asset(
-                                  getHeadSprite(),
-                                  fit: BoxFit.fill,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: Colors.green[400],
-                                      child: Icon(Icons.error, size: 10),
-                                    );
-                                  },
-                                ),
-                              );
-                            } else if (isSnake) {
-                              return Container(
-                                margin: EdgeInsets.all(0.5),
-                                child: Image.asset(
-                                  getBodySprite(snakeIndex),
-                                  fit: BoxFit.fill,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: Colors.green[600],
-                                    );
-                                  },
-                                ),
-                              );
-                            } else if (isFood) {
-                              return Container(
-                                margin: EdgeInsets.all(2),
-                                child: Image.asset(
-                                  'snake_asset/rabbit.png',
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.red,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              );
-                            }
-
-                            return Container(
-                              margin: EdgeInsets.all(0.5),
-                              child: Image.asset(
-                                'snake_asset/grass.png',
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    color: Colors.green[900],
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            
-            // Start Button
-            if (!isPlaying)
-              Padding(
-                padding: EdgeInsets.all(20),
-                child: ElevatedButton(
-                  onPressed: startGame,
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 50, vertical: 20),
-                    backgroundColor: Colors.green[700],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    elevation: 10,
-                  ),
-                  child: Text(
-                    'MANOMBOKA HILALAO',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            
-            // Control Buttons for Mobile
-            if (isPlaying && isPortrait)
-              Padding(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    // Up button
-                    IconButton(
-                      onPressed: () => changeDirection('up'),
-                      icon: Icon(Icons.arrow_drop_up),
-                      iconSize: 60,
-                      color: Colors.green,
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Left button
-                        IconButton(
-                          onPressed: () => changeDirection('left'),
-                          icon: Icon(Icons.arrow_left),
-                          iconSize: 60,
-                          color: Colors.green,
-                        ),
-                        SizedBox(width: 60),
-                        // Right button
-                        IconButton(
-                          onPressed: () => changeDirection('right'),
-                          icon: Icon(Icons.arrow_right),
-                          iconSize: 60,
-                          color: Colors.green,
-                        ),
-                      ],
-                    ),
-                    // Down button
-                    IconButton(
-                      onPressed: () => changeDirection('down'),
-                      icon: Icon(Icons.arrow_drop_down),
-                      iconSize: 60,
-                      color: Colors.green,
-                    ),
-                  ],
-                ),
-              ),
-            
-            SizedBox(height: 10),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
