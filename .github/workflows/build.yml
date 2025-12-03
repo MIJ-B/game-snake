@@ -52,7 +52,7 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./build/web
-        cname: false
+        force_orphan: true
 
   build-apk:
     needs: preview
