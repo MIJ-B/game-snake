@@ -41,20 +41,29 @@ jobs:
     - name: Create Flutter project
       run: |
         flutter create snake_game
-        cp -r lib/* snake_game/lib/ || true
         cd snake_game
     
-    # Step 6: Get dependencies
+    # Step 6: Copy all lib files
+    - name: Copy game files
+      run: |
+        # Fafana ny lib default
+        rm -rf snake_game/lib/*
+        # Kopiana ny lib-nao manontolo
+        if [ -d lib ]; then
+          cp -r lib/* snake_game/lib/
+        fi
+        # Verifiena ny main.dart
+        if [ ! -f snake_game/lib/main.dart ]; then
+          echo "Error: main.dart not found!"
+          exit 1
+        fi
+        echo "Files copied successfully:"
+        ls -la snake_game/lib/
+    
+    # Step 7: Get dependencies
     - name: Install dependencies
       run: flutter pub get
       working-directory: ./snake_game
-    
-    # Step 7: Copy main.dart to project
-    - name: Setup main file
-      run: |
-        if [ -f lib/main.dart ]; then
-          cp lib/main.dart snake_game/lib/main.dart
-        fi
     
     # Step 8: Analyze code
     - name: Analyze code
@@ -72,10 +81,37 @@ jobs:
     - name: Build Web Preview
       run: |
         flutter config --enable-web
-        flutter build web --release
+        # Build web with base-href for GitHub Pages
+        flutter build web --release --base-href "/${{ github.event.repository.name }}/"
       working-directory: ./snake_game
     
-    # Step 11: Deploy to GitHub Pages for Preview
+    # Step 11: Verify web build
+    - name: Check Web Build
+      run: |
+        echo "Web build contents:"
+        ls -la snake_game/build/web/
+        echo "---"
+        echo "Checking for main.dart.js:"
+        if [ -f snake_game/build/web/main.dart.js ]; then
+          echo "✓ main.dart.js found"
+        else
+          echo "✗ main.dart.js NOT found - Build may have failed"
+        fi
+    
+    # Step 11: Verify web build
+    - name: Check Web Build
+      run: |
+        echo "Web build contents:"
+        ls -la snake_game/build/web/
+        echo "---"
+        echo "Checking for main.dart.js:"
+        if [ -f snake_game/build/web/main.dart.js ]; then
+          echo "✓ main.dart.js found"
+        else
+          echo "✗ main.dart.js NOT found - Build may have failed"
+        fi
+    
+    # Step 12: Deploy to GitHub Pages for Preview
     - name: Deploy Preview to GitHub Pages
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: peaceiris/actions-gh-pages@v3
