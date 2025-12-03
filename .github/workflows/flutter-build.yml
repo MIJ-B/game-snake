@@ -37,37 +37,51 @@ jobs:
         flutter --version
         flutter doctor -v
     
-    # Step 5: Get dependencies
+    # Step 5: Create Flutter project structure
+    - name: Create Flutter project
+      run: |
+        flutter create snake_game
+        cp -r lib/* snake_game/lib/ || true
+        cd snake_game
+    
+    # Step 6: Get dependencies
     - name: Install dependencies
       run: flutter pub get
-      working-directory: ./lib
+      working-directory: ./snake_game
     
-    # Step 6: Analyze code
+    # Step 7: Copy main.dart to project
+    - name: Setup main file
+      run: |
+        if [ -f lib/main.dart ]; then
+          cp lib/main.dart snake_game/lib/main.dart
+        fi
+    
+    # Step 8: Analyze code
     - name: Analyze code
       run: flutter analyze
-      working-directory: ./lib
+      working-directory: ./snake_game
       continue-on-error: true
     
-    # Step 7: Run tests (raha misy)
+    # Step 9: Run tests (raha misy)
     - name: Run tests
       run: flutter test
-      working-directory: ./lib
+      working-directory: ./snake_game
       continue-on-error: true
     
-    # Step 8: Build APK
+    # Step 10: Build APK
     - name: Build APK
       run: flutter build apk --release
-      working-directory: ./lib
+      working-directory: ./snake_game
     
-    # Step 9: Upload APK artifact
+    # Step 11: Upload APK artifact
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: game-snake-apk
-        path: lib/build/app/outputs/flutter-apk/app-release.apk
+        path: snake_game/build/app/outputs/flutter-apk/app-release.apk
         retention-days: 30
     
-    # Step 10: Create release info
+    # Step 12: Create release info
     - name: Create build info
       run: |
         echo "Build completed successfully!" > build-info.txt
