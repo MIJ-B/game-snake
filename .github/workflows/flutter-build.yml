@@ -57,93 +57,35 @@ jobs:
           echo "Error: main.dart not found!"
           exit 1
         fi
-        echo "✓ Files copied successfully:"
+        echo "Files copied successfully:"
         ls -la snake_game/lib/
     
-    # Step 7: Copy assets (sprites & sounds)
-    - name: Copy assets
-      run: |
-        # Mamorona assets folder
-        mkdir -p snake_game/assets/sounds
-        mkdir -p snake_game/snake_asset
-        
-        # Kopiana ny snake_asset (sprites)
-        if [ -d snake_asset ]; then
-          echo "📦 Copying snake_asset sprites..."
-          cp -r snake_asset/* snake_game/snake_asset/
-          echo "✓ Sprites copied:"
-          ls -la snake_game/snake_asset/
-        else
-          echo "⚠️  Warning: snake_asset folder not found - game will use fallback graphics"
-        fi
-        
-        # Kopiana ny sounds
-        if [ -d assets/sounds ]; then
-          echo "🎵 Copying sound files..."
-          cp -r assets/sounds/* snake_game/assets/sounds/
-          echo "✓ Sound files copied:"
-          ls -la snake_game/assets/sounds/
-        else
-          echo "⚠️  Warning: assets/sounds folder not found - game will work without audio"
-        fi
-    
-    # Step 8: Update pubspec.yaml with assets
-    - name: Configure pubspec.yaml
-      run: |
-        cd snake_game
-        
-        # Backup original
-        cp pubspec.yaml pubspec.yaml.backup
-        
-        # Ampiana ny dependencies sy assets
-        cat >> pubspec.yaml << 'EOF'
-
-  # Game dependencies
-  audioplayers: ^5.2.1
-
-flutter:
-  uses-material-design: true
-  
-  # Game assets
-  assets:
-    - snake_asset/
-    - assets/sounds/
-EOF
-        
-        echo "✓ Updated pubspec.yaml with dependencies and assets"
-        echo "---"
-        cat pubspec.yaml
-    
-    # Step 9: Get dependencies
+    # Step 7: Get dependencies
     - name: Install dependencies
-      run: |
-        echo "📥 Installing dependencies..."
-        flutter pub get
+      run: flutter pub get
       working-directory: ./snake_game
 
-    # Step 10: Analyze code
+    # Step 8: Analyze code
     - name: Analyze code
       run: flutter analyze
       working-directory: ./snake_game
       continue-on-error: true
 
-    # Step 11: Run tests (raha misy)
+    # Step 9: Run tests (raha misy)
     - name: Run tests
       run: flutter test
       working-directory: ./snake_game
       continue-on-error: true
 
-    # Step 12: Build Web for Preview
+    # Step 10: Build Web for Preview
     - name: Build Web Preview
       run: |
-        echo "🌐 Building web version..."
         flutter config --enable-web
         # Build web with HTML renderer (miasa tsara kokoa)
         flutter build web --release --web-renderer html --base-href "/${{ github.event.repository.name }}/"
-        echo "✓ Web build completed"
       working-directory: ./snake_game
 
-    # Step 13: Fix web build for GitHub Pages
+    # Step 11: Fix web build for GitHub Pages
     - name: Fix GitHub Pages deployment
       run: |
         # Manamarina ny build
@@ -163,19 +105,20 @@ EOF
           exit 1
         fi
     
-    # Step 14: Verify web build
+    # Step 11: Verify web build
     - name: Check Web Build
       run: |
-        echo "🔍 Verifying web build..."
+        echo "Web build contents:"
         ls -la snake_game/build/web/
         echo "---"
+        echo "Checking for main.dart.js:"
         if [ -f snake_game/build/web/main.dart.js ]; then
           echo "✓ main.dart.js found"
         else
           echo "✗ main.dart.js NOT found - Build may have failed"
         fi
     
-    # Step 15: Deploy to GitHub Pages for Preview
+    # Step 12: Deploy to GitHub Pages for Preview
     - name: Deploy Preview to GitHub Pages
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: peaceiris/actions-gh-pages@v3
@@ -184,53 +127,34 @@ EOF
         publish_dir: ./snake_game/build/web
         publish_branch: gh-pages
 
-    # Step 16: Add preview URL comment
+    # Step 12: Add preview URL comment
     - name: Preview URL Info
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
-        echo "======================================"
-        echo "🎮 Game Preview Available!"
-        echo "======================================"
-        echo "🌐 URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
-        echo "⏱️  Preview will be available in 1-2 minutes!"
-        echo "======================================"
+        echo "🌐 Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
+        echo "Preview will be available in 1-2 minutes!"
     
-    # Step 17: Build APK
+    # Step 13: Build APK
     - name: Build APK
-      run: |
-        echo "📱 Building Android APK..."
-        flutter build apk --release
-        echo "✓ APK build completed"
+      run: flutter build apk --release
       working-directory: ./snake_game
 
-    # Step 18: Upload APK artifact
+    # Step 14: Upload APK artifact
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: snake-game-apk
+        name: game-snake-apk
         path: snake_game/build/app/outputs/flutter-apk/app-release.apk
         retention-days: 30
 
-    # Step 19: Create build info
+    # Step 15: Create build info
     - name: Create build info
       run: |
-        echo "=====================================" > build-info.txt
-        echo "🎮 Snake Game Build Info" >> build-info.txt
-        echo "=====================================" >> build-info.txt
-        echo "" >> build-info.txt
-        echo "✓ Build completed successfully!" >> build-info.txt
-        echo "📅 Build date: $(date)" >> build-info.txt
-        echo "🔧 Flutter version: $(flutter --version | head -n 1)" >> build-info.txt
-        echo "" >> build-info.txt
-        echo "🌐 Web Preview:" >> build-info.txt
-        echo "   https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> build-info.txt
-        echo "" >> build-info.txt
-        echo "📱 APK: Available in Actions artifacts" >> build-info.txt
-        echo "=====================================" >> build-info.txt
-        
-        cat build-info.txt
+        echo "Build completed successfully!" > build-info.txt
+        echo "Build date: $(date)" >> build-info.txt
+        echo "Flutter version: $(flutter --version | head -n 1)" >> build-info.txt
+        echo "Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> build-info.txt
     
-    # Step 20: Upload build info
     - name: Upload build info
       uses: actions/upload-artifact@v4
       with:
