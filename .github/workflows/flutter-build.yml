@@ -1,0 +1,81 @@
+name: Flutter Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Checkout ny code
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    # Step 2: Setup Java (ilaina ho an'ny Android build)
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+    
+    # Step 3: Setup Flutter SDK
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+    
+    # Step 4: Verify Flutter installation
+    - name: Verify Flutter
+      run: |
+        flutter --version
+        flutter doctor -v
+    
+    # Step 5: Get dependencies
+    - name: Install dependencies
+      run: flutter pub get
+      working-directory: ./lib
+    
+    # Step 6: Analyze code
+    - name: Analyze code
+      run: flutter analyze
+      working-directory: ./lib
+      continue-on-error: true
+    
+    # Step 7: Run tests (raha misy)
+    - name: Run tests
+      run: flutter test
+      working-directory: ./lib
+      continue-on-error: true
+    
+    # Step 8: Build APK
+    - name: Build APK
+      run: flutter build apk --release
+      working-directory: ./lib
+    
+    # Step 9: Upload APK artifact
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: game-snake-apk
+        path: lib/build/app/outputs/flutter-apk/app-release.apk
+        retention-days: 30
+    
+    # Step 10: Create release info
+    - name: Create build info
+      run: |
+        echo "Build completed successfully!" > build-info.txt
+        echo "Build date: $(date)" >> build-info.txt
+        echo "Flutter version: $(flutter --version | head -n 1)" >> build-info.txt
+    
+    - name: Upload build info
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-info
+        path: build-info.txt
