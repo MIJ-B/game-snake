@@ -89,7 +89,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       gridSizeY = (20 * aspectRatio).round();
       
       // Initialize snake in center
-      snake = [Offset(gridSizeX ~/ 2, gridSizeY ~/ 2)];
+      snake = [Offset((gridSizeX ~/ 2).toDouble(), (gridSizeY ~/ 2).toDouble())];
       generateFood();
       setState(() {});
     });
