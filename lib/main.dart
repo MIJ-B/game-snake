@@ -316,18 +316,32 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     direction = newDirection;
   }
 
-  // Function to get body part type and rotation
-  String _getBodyPartImage(int index) {
-    if (index >= snake.length - 1) {
-      // Tail
-      Offset current = snake[index];
-      Offset previous = snake[index - 1];
-      
-      if (previous.dx < current.dx) return 'snake_asset/tail_left.png';
-      if (previous.dx > current.dx) return 'snake_asset/tail_right.png';
-      if (previous.dy < current.dy) return 'snake_asset/tail_up.png';
-      if (previous.dy > current.dy) return 'snake_asset/tail_down.png';
+  // Get correct tail image based on direction
+  String _getTailImage(int tailIndex) {
+    if (tailIndex <= 0 || tailIndex >= snake.length) {
       return 'snake_asset/tail_right.png';
+    }
+    
+    Offset tailPos = snake[tailIndex];
+    Offset beforeTail = snake[tailIndex - 1];
+    
+    // Determine direction from body to tail
+    double dx = tailPos.dx - beforeTail.dx;
+    double dy = tailPos.dy - beforeTail.dy;
+    
+    if (dx > 0) return 'snake_asset/tail_right.png';      // Tail is to the right
+    if (dx < 0) return 'snake_asset/tail_left.png';       // Tail is to the left
+    if (dy > 0) return 'snake_asset/tail_down.png';       // Tail is down
+    if (dy < 0) return 'snake_asset/tail_up.png';         // Tail is up
+    
+    return 'snake_asset/tail_right.png';
+  }
+
+  // Get body part image
+  String _getBodyPartImage(int index) {
+    // Tail
+    if (index >= snake.length - 1) {
+      return _getTailImage(index);
     }
     
     // Middle body segments
@@ -340,18 +354,21 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       bool isCorner = (prev.dx != next.dx && prev.dy != next.dy);
       
       if (isCorner) {
-        // Determine corner type
-        if ((prev.dx < current.dx && next.dy > current.dy) || (next.dx < current.dx && prev.dy > current.dy)) {
-          return 'snake_asset/body_bottomleft.png';
-        }
-        if ((prev.dx > current.dx && next.dy > current.dy) || (next.dx > current.dx && prev.dy > current.dy)) {
-          return 'snake_asset/bodybottomright.png';
-        }
+        // Top-left corner
         if ((prev.dx < current.dx && next.dy < current.dy) || (next.dx < current.dx && prev.dy < current.dy)) {
           return 'snake_asset/body_topleft.png';
         }
+        // Top-right corner
         if ((prev.dx > current.dx && next.dy < current.dy) || (next.dx > current.dx && prev.dy < current.dy)) {
           return 'snake_asset/body_topright.png';
+        }
+        // Bottom-left corner
+        if ((prev.dx < current.dx && next.dy > current.dy) || (next.dx < current.dx && prev.dy > current.dy)) {
+          return 'snake_asset/body_bottomleft.png';
+        }
+        // Bottom-right corner
+        if ((prev.dx > current.dx && next.dy > current.dy) || (next.dx > current.dx && prev.dy > current.dy)) {
+          return 'snake_asset/bodybottomright.png';
         }
       }
       
@@ -383,14 +400,14 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     final isSmallScreen = screenSize.width < 400;
     
     return Scaffold(
-      backgroundColor: Color(0xFF0a0e27),
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
             // Compact Header
             _buildCompactHeader(isSmallScreen),
             
-            // Fullscreen Game Grid
+            // Fullscreen Game Grid (stretched)
             Expanded(
               child: _buildFullscreenGameGrid(screenSize),
             ),
@@ -523,63 +540,64 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         }
       },
       child: Container(
-        margin: EdgeInsets.all(5),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: isPlaying ? Colors.cyan.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: isPlaying ? Colors.cyan.withOpacity(0.2) : Colors.transparent,
-              blurRadius: 15,
-              spreadRadius: 3,
+        width: double.infinity,
+        height: double.infinity,
+        child: Stack(
+          children: [
+            // Background grass - stretched fullscreen
+            Positioned.fill(
+              child: Image.asset(
+                'snake_asset/grass.png',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFF7cb342), Color(0xFF558b2f)],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            
+            // Game grid (invisible, just for positioning)
+            GridView.builder(
+              physics: NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: gridSize,
+              ),
+              itemCount: gridSize * gridSize,
+              itemBuilder: (context, index) {
+                int x = index % gridSize;
+                int y = index ~/ gridSize;
+                Offset position = Offset(x.toDouble(), y.toDouble());
+
+                bool isSnake = snake.contains(position);
+                bool isFood = position == food;
+                bool isHead = position == snake.first;
+                
+                int snakeIndex = snake.indexOf(position);
+
+                // Only show snake and food, no grid lines
+                if (isHead) {
+                  return _buildSnakeHead();
+                } else if (isSnake) {
+                  return _buildSnakeBody(snakeIndex);
+                } else if (isFood) {
+                  return _buildFood();
+                }
+
+                // Empty transparent cell
+                return Container(
+                  color: Colors.transparent,
+                );
+              },
             ),
           ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(13),
-          child: GridView.builder(
-            physics: NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: gridSize,
-            ),
-            itemCount: gridSize * gridSize,
-            itemBuilder: (context, index) {
-              int x = index % gridSize;
-              int y = index ~/ gridSize;
-              Offset position = Offset(x.toDouble(), y.toDouble());
-
-              bool isSnake = snake.contains(position);
-              bool isFood = position == food;
-              bool isHead = position == snake.first;
-              
-              int snakeIndex = snake.indexOf(position);
-
-              // Background (grass)
-              if (!isSnake && !isFood) {
-                return Container(
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: AssetImage('snake_asset/grass.png'),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                );
-              }
-
-              if (isHead) {
-                return _buildSnakeHead();
-              } else if (isSnake) {
-                return _buildSnakeBody(snakeIndex);
-              } else if (isFood) {
-                return _buildFood();
-              }
-
-              return Container();
-            },
-          ),
         ),
       ),
     );
