@@ -35,8 +35,8 @@ class SnakeGame extends StatefulWidget {
 }
 
 class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
-  int gridSizeX = 20;  // Horizontal cells
-  int gridSizeY = 30;  // Vertical cells (more for portrait)
+  int gridSizeX = 20;
+  int gridSizeY = 30;
   
   List<Offset> snake = [];
   Offset food = Offset(10, 10);
@@ -80,7 +80,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   void _initializeGame() {
-    // Calculate grid based on screen
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final screenSize = MediaQuery.of(context).size;
       final aspectRatio = screenSize.height / screenSize.width;
@@ -88,7 +87,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       gridSizeX = 20;
       gridSizeY = (20 * aspectRatio).round();
       
-      // Initialize snake in center - FIXED: convert int to double
       snake = [Offset((gridSizeX ~/ 2).toDouble(), (gridSizeY ~/ 2).toDouble())];
       generateFood();
       setState(() {});
@@ -124,7 +122,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
   void startGame() {
     setState(() {
-      // FIXED: convert int to double for Offset constructor
       snake = [Offset((gridSizeX ~/ 2).toDouble(), (gridSizeY ~/ 2).toDouble())];
       direction = 'right';
       lastDirection = 'right';
@@ -161,14 +158,12 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           break;
       }
 
-      // Wall collision - using dynamic grid size
       if (newHead.dx < 0 || newHead.dx >= gridSizeX || 
           newHead.dy < 0 || newHead.dy >= gridSizeY) {
         gameOver();
         return;
       }
 
-      // Self collision
       if (snake.contains(newHead)) {
         gameOver();
         return;
@@ -176,7 +171,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
       snake.insert(0, newHead);
 
-      // Food eaten
       if (newHead == food) {
         score += 10;
         isEating = true;
@@ -338,7 +332,73 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     direction = newDirection;
   }
 
-  // Get correct tail image based on direction
+  // LOGIC TSARA HO AN'NY CORNER - mifanaraka amin'ny position marina
+  String _getBodyPartImage(int index) {
+    // Tail
+    if (index >= snake.length - 1) {
+      return _getTailImage(index);
+    }
+    
+    // Head (tsy tokony hitranga eto)
+    if (index == 0) {
+      return 'snake_asset/body_horizontal.png';
+    }
+    
+    // Body segments
+    Offset current = snake[index];
+    Offset prev = snake[index - 1];
+    Offset next = snake[index + 1];
+    
+    // Mahita ny direction avy amin'ny prev (avy aiza?)
+    double fromDx = current.dx - prev.dx;  // + = avy any havanana, - = avy any havia
+    double fromDy = current.dy - prev.dy;  // + = avy any ambany, - = avy any ambony
+    
+    // Mahita ny direction mankany amin'ny next (mankany aiza?)
+    double toDx = next.dx - current.dx;    // + = mankany havanana, - = mankany havia
+    double toDy = next.dy - current.dy;    // + = mankany ambany, - = mankany ambony
+    
+    // Raha tsy misy fiovana direction = mahitsy
+    if (fromDx == toDx && fromDy == toDy) {
+      if (fromDx != 0) {
+        return 'snake_asset/body_horizontal.png';  // Horizontal
+      } else {
+        return 'snake_asset/body_vertical.png';    // Vertical
+      }
+    }
+    
+    // CORNERS - vakio tsara ny logic:
+    
+    // TOP-LEFT corner: 
+    // - avy any havanana (fromDx > 0) mankany ambony (toDy < 0)
+    // - avy any ambany (fromDy > 0) mankany havia (toDx < 0)
+    if ((fromDx > 0 && toDy < 0) || (fromDy > 0 && toDx < 0)) {
+      return 'snake_asset/body_topleft.png';
+    }
+    
+    // TOP-RIGHT corner:
+    // - avy any havia (fromDx < 0) mankany ambony (toDy < 0)
+    // - avy any ambany (fromDy > 0) mankany havanana (toDx > 0)
+    if ((fromDx < 0 && toDy < 0) || (fromDy > 0 && toDx > 0)) {
+      return 'snake_asset/body_topright.png';
+    }
+    
+    // BOTTOM-LEFT corner:
+    // - avy any havanana (fromDx > 0) mankany ambany (toDy > 0)
+    // - avy any ambony (fromDy < 0) mankany havia (toDx < 0)
+    if ((fromDx > 0 && toDy > 0) || (fromDy < 0 && toDx < 0)) {
+      return 'snake_asset/body_bottomleft.png';
+    }
+    
+    // BOTTOM-RIGHT corner:
+    // - avy any havia (fromDx < 0) mankany ambany (toDy > 0)
+    // - avy any ambony (fromDy < 0) mankany havanana (toDx > 0)
+    if ((fromDx < 0 && toDy > 0) || (fromDy < 0 && toDx > 0)) {
+      return 'snake_asset/body_bottomright.png';
+    }
+    
+    return 'snake_asset/body_horizontal.png';
+  }
+
   String _getTailImage(int tailIndex) {
     if (snake.length < 2) {
       return 'snake_asset/tail_right.png';
@@ -347,78 +407,16 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     Offset tailPos = snake[tailIndex];
     Offset beforeTail = snake[tailIndex - 1];
     
-    // Direction from body segment TO tail
+    // Mahita ny direction avy amin'ny body mankany amin'ny tail
     double dx = tailPos.dx - beforeTail.dx;
     double dy = tailPos.dy - beforeTail.dy;
     
-    if (dx > 0) return 'snake_asset/tail_right.png';
-    if (dx < 0) return 'snake_asset/tail_left.png';
-    if (dy > 0) return 'snake_asset/tail_down.png';
-    if (dy < 0) return 'snake_asset/tail_up.png';
+    if (dx > 0) return 'snake_asset/tail_right.png';  // Tail any havanana
+    if (dx < 0) return 'snake_asset/tail_left.png';   // Tail any havia
+    if (dy > 0) return 'snake_asset/tail_down.png';   // Tail any ambany
+    if (dy < 0) return 'snake_asset/tail_up.png';     // Tail any ambony
     
     return 'snake_asset/tail_right.png';
-  }
-
-  // Get body part image with improved corner detection
-  String _getBodyPartImage(int index) {
-    // Tail
-    if (index >= snake.length - 1) {
-      return _getTailImage(index);
-    }
-    
-    // Head should not be processed here
-    if (index == 0) {
-      return 'snake_asset/body_horizontal.png';
-    }
-    
-    // Middle body segments
-    if (index > 0 && index < snake.length - 1) {
-      Offset current = snake[index];
-      Offset prev = snake[index - 1];
-      Offset next = snake[index + 1];
-      
-      // Calculate relative positions
-      double prevDx = prev.dx - current.dx;
-      double prevDy = prev.dy - current.dy;
-      double nextDx = next.dx - current.dx;
-      double nextDy = next.dy - current.dy;
-      
-      // Check if it's a corner (direction changes)
-      bool isCorner = (prevDx != nextDx && prevDy != nextDy);
-      
-      if (isCorner) {
-        // TOP-LEFT: coming from right/bottom, going to left/top
-        if ((prevDx > 0 && nextDy < 0) || (prevDy > 0 && nextDx < 0)) {
-          return 'snake_asset/body_topleft.png';
-        }
-        
-        // TOP-RIGHT: coming from left/bottom, going to right/top
-        if ((prevDx < 0 && nextDy < 0) || (prevDy > 0 && nextDx > 0)) {
-          return 'snake_asset/body_topright.png';
-        }
-        
-        // BOTTOM-LEFT: coming from right/top, going to left/bottom
-        if ((prevDx > 0 && nextDy > 0) || (prevDy < 0 && nextDx < 0)) {
-          return 'snake_asset/body_bottomleft.png';
-        }
-        
-        // BOTTOM-RIGHT: coming from left/top, going to right/bottom
-        if ((prevDx < 0 && nextDy > 0) || (prevDy < 0 && nextDx > 0)) {
-          return 'snake_asset/bodybottomright.png';
-        }
-      }
-      
-      // Straight segments
-      if (prevDx == nextDx) {
-        // Vertical movement
-        return 'snake_asset/body_vertical.png';
-      } else {
-        // Horizontal movement
-        return 'snake_asset/body_horizontal.png';
-      }
-    }
-    
-    return 'snake_asset/body_horizontal.png';
   }
 
   @override
@@ -442,15 +440,10 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       body: SafeArea(
         child: Column(
           children: [
-            // Compact Header
             _buildCompactHeader(isSmallScreen),
-            
-            // Fullscreen Game Grid (stretched to fill)
             Expanded(
               child: _buildFullscreenGameGrid(screenSize),
             ),
-            
-            // Start Button (only when not playing)
             if (!isPlaying)
               Padding(
                 padding: const EdgeInsets.all(15.0),
@@ -548,7 +541,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         height: double.infinity,
         child: Stack(
           children: [
-            // Background grass - stretched fullscreen
+            // Background grass
             Positioned.fill(
               child: Image.asset(
                 'snake_asset/grass.png',
@@ -567,7 +560,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
               ),
             ),
             
-            // Game grid overlay
+            // Game elements - SMOOTH, TSY MISY GRID
             LayoutBuilder(
               builder: (context, constraints) {
                 double cellWidth = constraints.maxWidth / gridSizeX;
@@ -575,7 +568,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                 
                 return Stack(
                   children: [
-                    // Snake segments
+                    // Snake segments - FENO NY CELL, TSY MISY MARGIN
                     ...snake.asMap().entries.map((entry) {
                       int index = entry.key;
                       Offset pos = entry.value;
@@ -617,10 +610,9 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           scale: scale,
           child: Image.asset(
             'snake_asset/head_${direction}.png',
-            fit: BoxFit.contain,
+            fit: BoxFit.fill,  // FILL = feno ny cell tsara
             errorBuilder: (context, error, stackTrace) {
               return Container(
-                margin: EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   gradient: RadialGradient(colors: [Colors.green[300]!, Colors.green[700]!]),
                   borderRadius: BorderRadius.circular(8),
@@ -639,7 +631,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       animation: bodyAnimController!,
       builder: (context, child) {
         double pulsePhase = (bodyAnimController!.value + (index / snake.length)) % 1.0;
-        double pulse = 0.96 + (sin(pulsePhase * 2 * pi) * 0.04);
+        double pulse = 0.98 + (sin(pulsePhase * 2 * pi) * 0.02);  // Pulse kely fotsiny
         
         String bodyImagePath = _getBodyPartImage(index);
         
@@ -647,10 +639,9 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           scale: pulse,
           child: Image.asset(
             bodyImagePath,
-            fit: BoxFit.contain,
+            fit: BoxFit.fill,  // FILL = tsy misy space eo amin'ny cell
             errorBuilder: (context, error, stackTrace) {
               return Container(
-                margin: EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: [Colors.green[600]!, Colors.green[800]!]),
                   borderRadius: BorderRadius.circular(6),
