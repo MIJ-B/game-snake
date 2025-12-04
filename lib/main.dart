@@ -48,7 +48,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   Timer? timer;
   bool isEating = false;
   AnimationController? eatingController;
-  AnimationController? bodyAnimController;
+  AnimationController? foodAnimController;  // Ny food ihany no misy animation
   AnimationController? gameOverController;
   
   final AudioPlayer _eatSound = AudioPlayer();
@@ -68,7 +68,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       duration: Duration(milliseconds: 200),
     );
 
-    bodyAnimController = AnimationController(
+    // Animation ho an'ny food ihany
+    foodAnimController = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 1500),
     )..repeat();
@@ -332,66 +333,44 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     direction = newDirection;
   }
 
-  // LOGIC TSARA HO AN'NY CORNER - mifanaraka amin'ny position marina
   String _getBodyPartImage(int index) {
-    // Tail
     if (index >= snake.length - 1) {
       return _getTailImage(index);
     }
     
-    // Head (tsy tokony hitranga eto)
     if (index == 0) {
       return 'snake_asset/body_horizontal.png';
     }
     
-    // Body segments
     Offset current = snake[index];
     Offset prev = snake[index - 1];
     Offset next = snake[index + 1];
     
-    // Mahita ny direction avy amin'ny prev (avy aiza?)
-    double fromDx = current.dx - prev.dx;  // + = avy any havanana, - = avy any havia
-    double fromDy = current.dy - prev.dy;  // + = avy any ambany, - = avy any ambony
+    double fromDx = current.dx - prev.dx;
+    double fromDy = current.dy - prev.dy;
+    double toDx = next.dx - current.dx;
+    double toDy = next.dy - current.dy;
     
-    // Mahita ny direction mankany amin'ny next (mankany aiza?)
-    double toDx = next.dx - current.dx;    // + = mankany havanana, - = mankany havia
-    double toDy = next.dy - current.dy;    // + = mankany ambany, - = mankany ambony
-    
-    // Raha tsy misy fiovana direction = mahitsy
     if (fromDx == toDx && fromDy == toDy) {
       if (fromDx != 0) {
-        return 'snake_asset/body_horizontal.png';  // Horizontal
+        return 'snake_asset/body_horizontal.png';
       } else {
-        return 'snake_asset/body_vertical.png';    // Vertical
+        return 'snake_asset/body_vertical.png';
       }
     }
     
-    // CORNERS - vakio tsara ny logic:
-    
-    // TOP-LEFT corner: 
-    // - avy any havanana (fromDx > 0) mankany ambony (toDy < 0)
-    // - avy any ambany (fromDy > 0) mankany havia (toDx < 0)
     if ((fromDx > 0 && toDy < 0) || (fromDy > 0 && toDx < 0)) {
       return 'snake_asset/body_topleft.png';
     }
     
-    // TOP-RIGHT corner:
-    // - avy any havia (fromDx < 0) mankany ambony (toDy < 0)
-    // - avy any ambany (fromDy > 0) mankany havanana (toDx > 0)
     if ((fromDx < 0 && toDy < 0) || (fromDy > 0 && toDx > 0)) {
       return 'snake_asset/body_topright.png';
     }
     
-    // BOTTOM-LEFT corner:
-    // - avy any havanana (fromDx > 0) mankany ambany (toDy > 0)
-    // - avy any ambony (fromDy < 0) mankany havia (toDx < 0)
     if ((fromDx > 0 && toDy > 0) || (fromDy < 0 && toDx < 0)) {
       return 'snake_asset/body_bottomleft.png';
     }
     
-    // BOTTOM-RIGHT corner:
-    // - avy any havia (fromDx < 0) mankany ambany (toDy > 0)
-    // - avy any ambony (fromDy < 0) mankany havanana (toDx > 0)
     if ((fromDx < 0 && toDy > 0) || (fromDy < 0 && toDx > 0)) {
       return 'snake_asset/body_bottomright.png';
     }
@@ -407,14 +386,13 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     Offset tailPos = snake[tailIndex];
     Offset beforeTail = snake[tailIndex - 1];
     
-    // Mahita ny direction avy amin'ny body mankany amin'ny tail
     double dx = tailPos.dx - beforeTail.dx;
     double dy = tailPos.dy - beforeTail.dy;
     
-    if (dx > 0) return 'snake_asset/tail_right.png';  // Tail any havanana
-    if (dx < 0) return 'snake_asset/tail_left.png';   // Tail any havia
-    if (dy > 0) return 'snake_asset/tail_down.png';   // Tail any ambany
-    if (dy < 0) return 'snake_asset/tail_up.png';     // Tail any ambony
+    if (dx > 0) return 'snake_asset/tail_right.png';
+    if (dx < 0) return 'snake_asset/tail_left.png';
+    if (dy > 0) return 'snake_asset/tail_down.png';
+    if (dy < 0) return 'snake_asset/tail_up.png';
     
     return 'snake_asset/tail_right.png';
   }
@@ -423,7 +401,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   void dispose() {
     timer?.cancel();
     eatingController?.dispose();
-    bodyAnimController?.dispose();
+    foodAnimController?.dispose();
     gameOverController?.dispose();
     _eatSound.dispose();
     _deathSound.dispose();
@@ -541,7 +519,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         height: double.infinity,
         child: Stack(
           children: [
-            // Background grass
             Positioned.fill(
               child: Image.asset(
                 'snake_asset/grass.png',
@@ -560,7 +537,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
               ),
             ),
             
-            // Game elements - SMOOTH, TSY MISY GRID
             LayoutBuilder(
               builder: (context, constraints) {
                 double cellWidth = constraints.maxWidth / gridSizeX;
@@ -568,7 +544,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                 
                 return Stack(
                   children: [
-                    // Snake segments - FENO NY CELL, TSY MISY MARGIN
+                    // Snake segments - TSY MISY ANIMATION 3D
                     ...snake.asMap().entries.map((entry) {
                       int index = entry.key;
                       Offset pos = entry.value;
@@ -601,16 +577,17 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     );
   }
 
+  // HEAD - Animation raha mihinana ihany
   Widget _buildSnakeHead() {
     return AnimatedBuilder(
       animation: eatingController!,
       builder: (context, child) {
-        double scale = 1.0 + (eatingController!.value * 0.2);
+        double scale = 1.0 + (eatingController!.value * 0.15);
         return Transform.scale(
           scale: scale,
           child: Image.asset(
             'snake_asset/head_${direction}.png',
-            fit: BoxFit.fill,  // FILL = feno ny cell tsara
+            fit: BoxFit.fill,
             errorBuilder: (context, error, stackTrace) {
               return Container(
                 decoration: BoxDecoration(
@@ -626,39 +603,30 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     );
   }
 
+  // BODY - TSY MISY ANIMATION, static fotsiny
   Widget _buildSnakeBody(int index) {
-    return AnimatedBuilder(
-      animation: bodyAnimController!,
-      builder: (context, child) {
-        double pulsePhase = (bodyAnimController!.value + (index / snake.length)) % 1.0;
-        double pulse = 0.98 + (sin(pulsePhase * 2 * pi) * 0.02);  // Pulse kely fotsiny
-        
-        String bodyImagePath = _getBodyPartImage(index);
-        
-        return Transform.scale(
-          scale: pulse,
-          child: Image.asset(
-            bodyImagePath,
-            fit: BoxFit.fill,  // FILL = tsy misy space eo amin'ny cell
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [Colors.green[600]!, Colors.green[800]!]),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              );
-            },
+    String bodyImagePath = _getBodyPartImage(index);
+    
+    return Image.asset(
+      bodyImagePath,
+      fit: BoxFit.fill,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [Colors.green[600]!, Colors.green[800]!]),
+            borderRadius: BorderRadius.circular(6),
           ),
         );
       },
     );
   }
 
+  // FOOD - animation mihitsy
   Widget _buildFood() {
     return AnimatedBuilder(
-      animation: bodyAnimController!,
+      animation: foodAnimController!,
       builder: (context, child) {
-        double scale = 1.0 + (sin(bodyAnimController!.value * 2 * pi) * 0.15);
+        double scale = 1.0 + (sin(foodAnimController!.value * 2 * pi) * 0.15);
         return Transform.scale(
           scale: scale,
           child: Image.asset(
