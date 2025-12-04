@@ -88,7 +88,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       gridSizeX = 20;
       gridSizeY = (20 * aspectRatio).round();
       
-      // Initialize snake in center
+      // Initialize snake in center - FIXED: convert int to double
       snake = [Offset((gridSizeX ~/ 2).toDouble(), (gridSizeY ~/ 2).toDouble())];
       generateFood();
       setState(() {});
@@ -124,7 +124,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
   void startGame() {
     setState(() {
-      snake = [Offset(gridSizeX ~/ 2, gridSizeY ~/ 2)];
+      // FIXED: convert int to double for Offset constructor
+      snake = [Offset((gridSizeX ~/ 2).toDouble(), (gridSizeY ~/ 2).toDouble())];
       direction = 'right';
       lastDirection = 'right';
       score = 0;
