@@ -35,8 +35,10 @@ class SnakeGame extends StatefulWidget {
 }
 
 class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
-  static const int gridSize = 20;
-  List<Offset> snake = [Offset(5, 5)];
+  int gridSizeX = 20;  // Horizontal cells
+  int gridSizeY = 30;  // Vertical cells (more for portrait)
+  
+  List<Offset> snake = [];
   Offset food = Offset(10, 10);
   String direction = 'right';
   String lastDirection = 'right';
@@ -58,7 +60,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    generateFood();
+    _initializeGame();
     _loadBestScore();
     
     eatingController = AnimationController(
@@ -75,6 +77,22 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       vsync: this,
       duration: Duration(milliseconds: 500),
     );
+  }
+
+  void _initializeGame() {
+    // Calculate grid based on screen
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final screenSize = MediaQuery.of(context).size;
+      final aspectRatio = screenSize.height / screenSize.width;
+      
+      gridSizeX = 20;
+      gridSizeY = (20 * aspectRatio).round();
+      
+      // Initialize snake in center
+      snake = [Offset(gridSizeX ~/ 2, gridSizeY ~/ 2)];
+      generateFood();
+      setState(() {});
+    });
   }
 
   void _playSound(String sound) async {
@@ -106,7 +124,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
   void startGame() {
     setState(() {
-      snake = [Offset(5, 5)];
+      snake = [Offset(gridSizeX ~/ 2, gridSizeY ~/ 2)];
       direction = 'right';
       lastDirection = 'right';
       score = 0;
@@ -142,12 +160,14 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           break;
       }
 
-      if (newHead.dx < 0 || newHead.dx >= gridSize || 
-          newHead.dy < 0 || newHead.dy >= gridSize) {
+      // Wall collision - using dynamic grid size
+      if (newHead.dx < 0 || newHead.dx >= gridSizeX || 
+          newHead.dy < 0 || newHead.dy >= gridSizeY) {
         gameOver();
         return;
       }
 
+      // Self collision
       if (snake.contains(newHead)) {
         gameOver();
         return;
@@ -155,6 +175,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
       snake.insert(0, newHead);
 
+      // Food eaten
       if (newHead == food) {
         score += 10;
         isEating = true;
@@ -187,8 +208,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     Offset newFood;
     do {
       newFood = Offset(
-        random.nextInt(gridSize).toDouble(),
-        random.nextInt(gridSize).toDouble(),
+        random.nextInt(gridSizeX).toDouble(),
+        random.nextInt(gridSizeY).toDouble(),
       );
     } while (snake.contains(newFood));
 
@@ -318,30 +339,35 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
   // Get correct tail image based on direction
   String _getTailImage(int tailIndex) {
-    if (tailIndex <= 0 || tailIndex >= snake.length) {
+    if (snake.length < 2) {
       return 'snake_asset/tail_right.png';
     }
     
     Offset tailPos = snake[tailIndex];
     Offset beforeTail = snake[tailIndex - 1];
     
-    // Determine direction from body to tail
+    // Direction from body segment TO tail
     double dx = tailPos.dx - beforeTail.dx;
     double dy = tailPos.dy - beforeTail.dy;
     
-    if (dx > 0) return 'snake_asset/tail_right.png';      // Tail is to the right
-    if (dx < 0) return 'snake_asset/tail_left.png';       // Tail is to the left
-    if (dy > 0) return 'snake_asset/tail_down.png';       // Tail is down
-    if (dy < 0) return 'snake_asset/tail_up.png';         // Tail is up
+    if (dx > 0) return 'snake_asset/tail_right.png';
+    if (dx < 0) return 'snake_asset/tail_left.png';
+    if (dy > 0) return 'snake_asset/tail_down.png';
+    if (dy < 0) return 'snake_asset/tail_up.png';
     
     return 'snake_asset/tail_right.png';
   }
 
-  // Get body part image
+  // Get body part image with improved corner detection
   String _getBodyPartImage(int index) {
     // Tail
     if (index >= snake.length - 1) {
       return _getTailImage(index);
+    }
+    
+    // Head should not be processed here
+    if (index == 0) {
+      return 'snake_asset/body_horizontal.png';
     }
     
     // Middle body segments
@@ -350,32 +376,43 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       Offset prev = snake[index - 1];
       Offset next = snake[index + 1];
       
-      // Check for corners
-      bool isCorner = (prev.dx != next.dx && prev.dy != next.dy);
+      // Calculate relative positions
+      double prevDx = prev.dx - current.dx;
+      double prevDy = prev.dy - current.dy;
+      double nextDx = next.dx - current.dx;
+      double nextDy = next.dy - current.dy;
+      
+      // Check if it's a corner (direction changes)
+      bool isCorner = (prevDx != nextDx && prevDy != nextDy);
       
       if (isCorner) {
-        // Top-left corner
-        if ((prev.dx < current.dx && next.dy < current.dy) || (next.dx < current.dx && prev.dy < current.dy)) {
+        // TOP-LEFT: coming from right/bottom, going to left/top
+        if ((prevDx > 0 && nextDy < 0) || (prevDy > 0 && nextDx < 0)) {
           return 'snake_asset/body_topleft.png';
         }
-        // Top-right corner
-        if ((prev.dx > current.dx && next.dy < current.dy) || (next.dx > current.dx && prev.dy < current.dy)) {
+        
+        // TOP-RIGHT: coming from left/bottom, going to right/top
+        if ((prevDx < 0 && nextDy < 0) || (prevDy > 0 && nextDx > 0)) {
           return 'snake_asset/body_topright.png';
         }
-        // Bottom-left corner
-        if ((prev.dx < current.dx && next.dy > current.dy) || (next.dx < current.dx && prev.dy > current.dy)) {
+        
+        // BOTTOM-LEFT: coming from right/top, going to left/bottom
+        if ((prevDx > 0 && nextDy > 0) || (prevDy < 0 && nextDx < 0)) {
           return 'snake_asset/body_bottomleft.png';
         }
-        // Bottom-right corner
-        if ((prev.dx > current.dx && next.dy > current.dy) || (next.dx > current.dx && prev.dy > current.dy)) {
+        
+        // BOTTOM-RIGHT: coming from left/top, going to right/bottom
+        if ((prevDx < 0 && nextDy > 0) || (prevDy < 0 && nextDx > 0)) {
           return 'snake_asset/bodybottomright.png';
         }
       }
       
       // Straight segments
-      if (prev.dx == next.dx) {
+      if (prevDx == nextDx) {
+        // Vertical movement
         return 'snake_asset/body_vertical.png';
       } else {
+        // Horizontal movement
         return 'snake_asset/body_horizontal.png';
       }
     }
@@ -407,7 +444,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
             // Compact Header
             _buildCompactHeader(isSmallScreen),
             
-            // Fullscreen Game Grid (stretched)
+            // Fullscreen Game Grid (stretched to fill)
             Expanded(
               child: _buildFullscreenGameGrid(screenSize),
             ),
@@ -444,39 +481,20 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Score
           Row(
             children: [
-              Text(
-                '🐍',
-                style: TextStyle(fontSize: isSmall ? 20 : 24),
-              ),
+              Text('🐍', style: TextStyle(fontSize: isSmall ? 20 : 24)),
               SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'Score',
-                    style: TextStyle(
-                      fontSize: isSmall ? 10 : 12,
-                      color: Colors.white70,
-                    ),
-                  ),
-                  Text(
-                    '$score',
-                    style: TextStyle(
-                      fontSize: isSmall ? 18 : 22,
-                      color: Colors.greenAccent,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  Text('Score', style: TextStyle(fontSize: isSmall ? 10 : 12, color: Colors.white70)),
+                  Text('$score', style: TextStyle(fontSize: isSmall ? 18 : 22, color: Colors.greenAccent, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
           ),
-          
-          // Best Score
           Container(
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -489,30 +507,13 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
               children: [
                 Icon(Icons.emoji_events, color: Colors.amber, size: isSmall ? 16 : 20),
                 SizedBox(width: 5),
-                Text(
-                  '$bestScore',
-                  style: TextStyle(
-                    fontSize: isSmall ? 16 : 20,
-                    color: Colors.amber,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('$bestScore', style: TextStyle(fontSize: isSmall ? 16 : 20, color: Colors.amber, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
-          
-          // Sound Toggle
           IconButton(
-            icon: Icon(
-              soundEnabled ? Icons.volume_up : Icons.volume_off,
-              color: Colors.white,
-              size: isSmall ? 20 : 24,
-            ),
-            onPressed: () {
-              setState(() {
-                soundEnabled = !soundEnabled;
-              });
-            },
+            icon: Icon(soundEnabled ? Icons.volume_up : Icons.volume_off, color: Colors.white, size: isSmall ? 20 : 24),
+            onPressed: () => setState(() => soundEnabled = !soundEnabled),
             padding: EdgeInsets.all(8),
             constraints: BoxConstraints(),
           ),
@@ -522,6 +523,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   Widget _buildFullscreenGameGrid(Size screenSize) {
+    if (snake.isEmpty) return Container();
+    
     return GestureDetector(
       onVerticalDragUpdate: (details) {
         if (!isPlaying) return;
@@ -563,37 +566,38 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
               ),
             ),
             
-            // Game grid (invisible, just for positioning)
-            GridView.builder(
-              physics: NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: gridSize,
-              ),
-              itemCount: gridSize * gridSize,
-              itemBuilder: (context, index) {
-                int x = index % gridSize;
-                int y = index ~/ gridSize;
-                Offset position = Offset(x.toDouble(), y.toDouble());
-
-                bool isSnake = snake.contains(position);
-                bool isFood = position == food;
-                bool isHead = position == snake.first;
+            // Game grid overlay
+            LayoutBuilder(
+              builder: (context, constraints) {
+                double cellWidth = constraints.maxWidth / gridSizeX;
+                double cellHeight = constraints.maxHeight / gridSizeY;
                 
-                int snakeIndex = snake.indexOf(position);
-
-                // Only show snake and food, no grid lines
-                if (isHead) {
-                  return _buildSnakeHead();
-                } else if (isSnake) {
-                  return _buildSnakeBody(snakeIndex);
-                } else if (isFood) {
-                  return _buildFood();
-                }
-
-                // Empty transparent cell
-                return Container(
-                  color: Colors.transparent,
+                return Stack(
+                  children: [
+                    // Snake segments
+                    ...snake.asMap().entries.map((entry) {
+                      int index = entry.key;
+                      Offset pos = entry.value;
+                      bool isHead = index == 0;
+                      
+                      return Positioned(
+                        left: pos.dx * cellWidth,
+                        top: pos.dy * cellHeight,
+                        width: cellWidth,
+                        height: cellHeight,
+                        child: isHead ? _buildSnakeHead() : _buildSnakeBody(index),
+                      );
+                    }).toList(),
+                    
+                    // Food
+                    Positioned(
+                      left: food.dx * cellWidth,
+                      top: food.dy * cellHeight,
+                      width: cellWidth,
+                      height: cellHeight,
+                      child: _buildFood(),
+                    ),
+                  ],
                 );
               },
             ),
@@ -610,26 +614,19 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         double scale = 1.0 + (eatingController!.value * 0.2);
         return Transform.scale(
           scale: scale,
-          child: Container(
-            child: Image.asset(
-              'snake_asset/head_${direction}.png',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [Colors.green[300]!, Colors.green[700]!],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withOpacity(0.6),
-                        blurRadius: 6,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+          child: Image.asset(
+            'snake_asset/head_${direction}.png',
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                margin: EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(colors: [Colors.green[300]!, Colors.green[700]!]),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.6), blurRadius: 6)],
+                ),
+              );
+            },
           ),
         );
       },
@@ -647,20 +644,18 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         
         return Transform.scale(
           scale: pulse,
-          child: Container(
-            child: Image.asset(
-              bodyImagePath,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green[600]!, Colors.green[800]!],
-                    ),
-                  ),
-                );
-              },
-            ),
+          child: Image.asset(
+            bodyImagePath,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                margin: EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [Colors.green[600]!, Colors.green[800]!]),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              );
+            },
           ),
         );
       },
@@ -674,27 +669,19 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         double scale = 1.0 + (sin(bodyAnimController!.value * 2 * pi) * 0.15);
         return Transform.scale(
           scale: scale,
-          child: Container(
-            child: Image.asset(
-              'snake_asset/rabbit.png',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [Colors.red[400]!, Colors.red[800]!],
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withOpacity(0.6),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+          child: Image.asset(
+            'snake_asset/rabbit.png',
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                margin: EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(colors: [Colors.red[400]!, Colors.red[800]!]),
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: Colors.red.withOpacity(0.6), blurRadius: 8)],
+                ),
+              );
+            },
           ),
         );
       },
@@ -705,20 +692,11 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     return ElevatedButton.icon(
       onPressed: startGame,
       icon: Icon(Icons.play_arrow, size: 28, color: Colors.white),
-      label: Text(
-        'MANOMBOKA',
-        style: TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
+      label: Text('MANOMBOKA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
       style: ElevatedButton.styleFrom(
         padding: EdgeInsets.symmetric(horizontal: 35, vertical: 15),
         backgroundColor: Colors.green[700],
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         elevation: 8,
         shadowColor: Colors.green.withOpacity(0.5),
       ),
