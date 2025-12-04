@@ -49,7 +49,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   AnimationController? bodyAnimController;
   AnimationController? gameOverController;
   
-  // Audio players - eat sy death ihany
   final AudioPlayer _eatSound = AudioPlayer();
   final AudioPlayer _deathSound = AudioPlayer();
   
@@ -84,7 +83,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     try {
       switch (sound) {
         case 'eat':
-          await _eatSound.stop(); // Stop previous if playing
+          await _eatSound.stop();
           await _eatSound.play(AssetSource('sounds/eat.wav'));
           break;
         case 'death':
@@ -93,18 +92,16 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           break;
       }
     } catch (e) {
-      // Tsy misy sound file - tsy maninona
       print('Sound not found: $e');
     }
   }
 
   void _loadBestScore() async {
-    // Raha misy SharedPreferences dia ao no alaina
-    // bestScore = prefs.getInt('bestScore') ?? 0;
+    // SharedPreferences implementation here
   }
 
   void _saveBestScore() async {
-    // prefs.setInt('bestScore', bestScore);
+    // SharedPreferences implementation here
   }
 
   void startGame() {
@@ -145,14 +142,12 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           break;
       }
 
-      // Wall collision
       if (newHead.dx < 0 || newHead.dx >= gridSize || 
           newHead.dy < 0 || newHead.dy >= gridSize) {
         gameOver();
         return;
       }
 
-      // Self collision
       if (snake.contains(newHead)) {
         gameOver();
         return;
@@ -160,11 +155,10 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
 
       snake.insert(0, newHead);
 
-      // Food eaten
       if (newHead == food) {
         score += 10;
         isEating = true;
-        _playSound('eat'); // Play eat sound
+        _playSound('eat');
         
         eatingController?.forward().then((_) {
           eatingController?.reverse();
@@ -175,7 +169,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
         
         generateFood();
         
-        // Speed increase every 50 points
         if (score % 50 == 0 && gameSpeed > 100) {
           gameSpeed -= 20;
           timer?.cancel();
@@ -205,7 +198,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   void gameOver() {
     timer?.cancel();
     isPlaying = false;
-    _playSound('death'); // Play death sound
+    _playSound('death');
     gameOverController?.forward();
     
     if (score > bestScore) {
@@ -314,7 +307,6 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   void changeDirection(String newDirection) {
-    // Prevent 180 degree turns
     if ((lastDirection == 'up' && newDirection == 'down') ||
         (lastDirection == 'down' && newDirection == 'up') ||
         (lastDirection == 'left' && newDirection == 'right') ||
@@ -322,6 +314,56 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       return;
     }
     direction = newDirection;
+  }
+
+  // Function to get body part type and rotation
+  String _getBodyPartImage(int index) {
+    if (index >= snake.length - 1) {
+      // Tail
+      Offset current = snake[index];
+      Offset previous = snake[index - 1];
+      
+      if (previous.dx < current.dx) return 'snake_asset/tail_left.png';
+      if (previous.dx > current.dx) return 'snake_asset/tail_right.png';
+      if (previous.dy < current.dy) return 'snake_asset/tail_up.png';
+      if (previous.dy > current.dy) return 'snake_asset/tail_down.png';
+      return 'snake_asset/tail_right.png';
+    }
+    
+    // Middle body segments
+    if (index > 0 && index < snake.length - 1) {
+      Offset current = snake[index];
+      Offset prev = snake[index - 1];
+      Offset next = snake[index + 1];
+      
+      // Check for corners
+      bool isCorner = (prev.dx != next.dx && prev.dy != next.dy);
+      
+      if (isCorner) {
+        // Determine corner type
+        if ((prev.dx < current.dx && next.dy > current.dy) || (next.dx < current.dx && prev.dy > current.dy)) {
+          return 'snake_asset/body_bottomleft.png';
+        }
+        if ((prev.dx > current.dx && next.dy > current.dy) || (next.dx > current.dx && prev.dy > current.dy)) {
+          return 'snake_asset/bodybottomright.png';
+        }
+        if ((prev.dx < current.dx && next.dy < current.dy) || (next.dx < current.dx && prev.dy < current.dy)) {
+          return 'snake_asset/body_topleft.png';
+        }
+        if ((prev.dx > current.dx && next.dy < current.dy) || (next.dx > current.dx && prev.dy < current.dy)) {
+          return 'snake_asset/body_topright.png';
+        }
+      }
+      
+      // Straight segments
+      if (prev.dx == next.dx) {
+        return 'snake_asset/body_vertical.png';
+      } else {
+        return 'snake_asset/body_horizontal.png';
+      }
+    }
+    
+    return 'snake_asset/body_horizontal.png';
   }
 
   @override
@@ -345,30 +387,29 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            _buildHeader(isSmallScreen),
+            // Compact Header
+            _buildCompactHeader(isSmallScreen),
             
-            // Game Grid
+            // Fullscreen Game Grid
             Expanded(
-              child: _buildGameGrid(screenSize),
+              child: _buildFullscreenGameGrid(screenSize),
             ),
             
-            // Controls
+            // Start Button (only when not playing)
             if (!isPlaying)
-              _buildStartButton()
-            else
-              _buildGameControls(isSmallScreen),
-              
-            SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.all(15.0),
+                child: _buildStartButton(),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(bool isSmall) {
+  Widget _buildCompactHeader(bool isSmall) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+      padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [Color(0xFF1a237e), Color(0xFF0d47a1)],
@@ -379,121 +420,126 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
           BoxShadow(
             color: Colors.blue.withOpacity(0.3),
             blurRadius: 10,
-            offset: Offset(0, 5),
+            offset: Offset(0, 3),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Score
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Text(
+                '🐍',
+                style: TextStyle(fontSize: isSmall ? 20 : 24),
+              ),
+              SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '🐍 SNAKE 3D',
+                    'Score',
                     style: TextStyle(
-                      fontSize: isSmall ? 20 : 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      shadows: [
-                        Shadow(color: Colors.green.withOpacity(0.8), blurRadius: 10)
-                      ]
+                      fontSize: isSmall ? 10 : 12,
+                      color: Colors.white70,
                     ),
                   ),
                   Text(
-                    'Score: $score',
+                    '$score',
                     style: TextStyle(
-                      fontSize: isSmall ? 16 : 18,
+                      fontSize: isSmall ? 18 : 22,
                       color: Colors.greenAccent,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.amber, width: 2),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.emoji_events, color: Colors.amber, size: isSmall ? 20 : 24),
-                    SizedBox(width: 5),
-                    Text(
-                      '$bestScore',
-                      style: TextStyle(
-                        fontSize: isSmall ? 18 : 22,
-                        color: Colors.amber,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  soundEnabled ? Icons.volume_up : Icons.volume_off,
-                  color: Colors.white,
-                  size: isSmall ? 24 : 28,
-                ),
-                onPressed: () {
-                  setState(() {
-                    soundEnabled = !soundEnabled;
-                  });
-                },
-              ),
             ],
+          ),
+          
+          // Best Score
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.amber, width: 1.5),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.emoji_events, color: Colors.amber, size: isSmall ? 16 : 20),
+                SizedBox(width: 5),
+                Text(
+                  '$bestScore',
+                  style: TextStyle(
+                    fontSize: isSmall ? 16 : 20,
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Sound Toggle
+          IconButton(
+            icon: Icon(
+              soundEnabled ? Icons.volume_up : Icons.volume_off,
+              color: Colors.white,
+              size: isSmall ? 20 : 24,
+            ),
+            onPressed: () {
+              setState(() {
+                soundEnabled = !soundEnabled;
+              });
+            },
+            padding: EdgeInsets.all(8),
+            constraints: BoxConstraints(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildGameGrid(Size screenSize) {
+  Widget _buildFullscreenGameGrid(Size screenSize) {
     return GestureDetector(
       onVerticalDragUpdate: (details) {
         if (!isPlaying) return;
-        if (details.delta.dy > 5) {
+        if (details.delta.dy > 3) {
           changeDirection('down');
-        } else if (details.delta.dy < -5) {
+        } else if (details.delta.dy < -3) {
           changeDirection('up');
         }
       },
       onHorizontalDragUpdate: (details) {
         if (!isPlaying) return;
-        if (details.delta.dx > 5) {
+        if (details.delta.dx > 3) {
           changeDirection('right');
-        } else if (details.delta.dx < -5) {
+        } else if (details.delta.dx < -3) {
           changeDirection('left');
         }
       },
       child: Container(
-        margin: EdgeInsets.all(10),
+        margin: EdgeInsets.all(5),
         decoration: BoxDecoration(
-          gradient: RadialGradient(
-            colors: [Color(0xFF1a237e), Color(0xFF0a0e27)],
-            center: Alignment.center,
-            radius: 1.5,
-          ),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(15),
           border: Border.all(
-            color: Colors.cyan.withOpacity(0.5),
-            width: 3,
+            color: isPlaying ? Colors.cyan.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
+            width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.cyan.withOpacity(0.3),
-              blurRadius: 20,
-              spreadRadius: 5,
+              color: isPlaying ? Colors.cyan.withOpacity(0.2) : Colors.transparent,
+              blurRadius: 15,
+              spreadRadius: 3,
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(17),
+          borderRadius: BorderRadius.circular(13),
           child: GridView.builder(
             physics: NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -511,6 +557,18 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
               
               int snakeIndex = snake.indexOf(position);
 
+              // Background (grass)
+              if (!isSnake && !isFood) {
+                return Container(
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage('snake_asset/grass.png'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                );
+              }
+
               if (isHead) {
                 return _buildSnakeHead();
               } else if (isSnake) {
@@ -519,13 +577,7 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                 return _buildFood();
               }
 
-              return Container(
-                margin: EdgeInsets.all(0.5),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              );
+              return Container();
             },
           ),
         ),
@@ -537,26 +589,23 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     return AnimatedBuilder(
       animation: eatingController!,
       builder: (context, child) {
-        double scale = 1.0 + (eatingController!.value * 0.3);
+        double scale = 1.0 + (eatingController!.value * 0.2);
         return Transform.scale(
           scale: scale,
           child: Container(
-            margin: EdgeInsets.all(1),
             child: Image.asset(
               'snake_asset/head_${direction}.png',
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
                       colors: [Colors.green[300]!, Colors.green[700]!],
                     ),
-                    borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.green.withOpacity(0.6),
-                        blurRadius: 8,
-                        spreadRadius: 2,
+                        blurRadius: 6,
                       ),
                     ],
                   ),
@@ -574,40 +623,22 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
       animation: bodyAnimController!,
       builder: (context, child) {
         double pulsePhase = (bodyAnimController!.value + (index / snake.length)) % 1.0;
-        double pulse = 0.95 + (sin(pulsePhase * 2 * pi) * 0.05);
+        double pulse = 0.96 + (sin(pulsePhase * 2 * pi) * 0.04);
         
-        String bodyType = 'body_vertical';
-        if (index > 0 && index < snake.length - 1) {
-          Offset current = snake[index];
-          Offset prev = snake[index - 1];
-          Offset next = snake[index + 1];
-          
-          // Detect body orientation
-          if ((prev.dx == next.dx) || (prev.dy == next.dy)) {
-            bodyType = (prev.dx == next.dx) ? 'body_vertical' : 'body_horizontal';
-          }
-        }
+        String bodyImagePath = _getBodyPartImage(index);
         
         return Transform.scale(
           scale: pulse,
           child: Container(
-            margin: EdgeInsets.all(1),
             child: Image.asset(
-              'snake_asset/$bodyType.png',
-              fit: BoxFit.contain,
+              bodyImagePath,
+              fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Colors.green[600]!, Colors.green[800]!],
                     ),
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withOpacity(0.4),
-                        blurRadius: 4,
-                      ),
-                    ],
                   ),
                 );
               },
@@ -622,14 +653,13 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
     return AnimatedBuilder(
       animation: bodyAnimController!,
       builder: (context, child) {
-        double scale = 1.0 + (sin(bodyAnimController!.value * 2 * pi) * 0.2);
+        double scale = 1.0 + (sin(bodyAnimController!.value * 2 * pi) * 0.15);
         return Transform.scale(
           scale: scale,
           child: Container(
-            margin: EdgeInsets.all(2),
             child: Image.asset(
               'snake_asset/rabbit.png',
-              fit: BoxFit.contain,
+              fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
                 return Container(
                   decoration: BoxDecoration(
@@ -639,9 +669,8 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.red.withOpacity(0.8),
-                        blurRadius: 10,
-                        spreadRadius: 3,
+                        color: Colors.red.withOpacity(0.6),
+                        blurRadius: 8,
                       ),
                     ],
                   ),
@@ -655,99 +684,25 @@ class _SnakeGameState extends State<SnakeGame> with TickerProviderStateMixin {
   }
 
   Widget _buildStartButton() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: ElevatedButton.icon(
-        onPressed: startGame,
-        icon: Icon(Icons.play_arrow, size: 32, color: Colors.white),
-        label: Text(
-          'MANOMBOKA HILALAO',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          padding: EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-          backgroundColor: Colors.green[700],
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          elevation: 10,
-          shadowColor: Colors.green.withOpacity(0.5),
+    return ElevatedButton.icon(
+      onPressed: startGame,
+      icon: Icon(Icons.play_arrow, size: 28, color: Colors.white),
+      label: Text(
+        'MANOMBOKA',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
         ),
       ),
-    );
-  }
-
-  Widget _buildGameControls(bool isSmall) {
-    return Container(
-      padding: EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Up button
-          _buildControlButton(
-            icon: Icons.arrow_upward,
-            onPressed: () => changeDirection('up'),
-          ),
-          SizedBox(height: 10),
-          // Left, Down, Right buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildControlButton(
-                icon: Icons.arrow_back,
-                onPressed: () => changeDirection('left'),
-              ),
-              SizedBox(width: 20),
-              _buildControlButton(
-                icon: Icons.arrow_downward,
-                onPressed: () => changeDirection('down'),
-              ),
-              SizedBox(width: 20),
-              _buildControlButton(
-                icon: Icons.arrow_forward,
-                onPressed: () => changeDirection('right'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildControlButton({required IconData icon, required VoidCallback onPressed}) {
-    return Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [Colors.blue[700]!, Colors.blue[900]!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+      style: ElevatedButton.styleFrom(
+        padding: EdgeInsets.symmetric(horizontal: 35, vertical: 15),
+        backgroundColor: Colors.green[700],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withOpacity(0.5),
-            blurRadius: 10,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          customBorder: CircleBorder(),
-          child: Container(
-            padding: EdgeInsets.all(15),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 32,
-            ),
-          ),
-        ),
+        elevation: 8,
+        shadowColor: Colors.green.withOpacity(0.5),
       ),
     );
   }
