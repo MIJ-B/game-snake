@@ -227,11 +227,6 @@ jobs:
         else
           echo "❌ main.dart.js NOT found!"
         fi
-        
-        # List all web assets
-        echo ""
-        echo "📋 All web build files:"
-        find snake_game/build/web -type f | head -20
     
     # Step 14: Deploy to GitHub Pages for Preview
     - name: Deploy Preview to GitHub Pages
@@ -241,7 +236,7 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./snake_game/build/web
         publish_branch: gh-pages
-        cname: false  # Set to your custom domain if you have one
+        cname: false
 
     # Step 15: Add preview URL comment
     - name: Preview URL Info
@@ -251,6 +246,39 @@ jobs:
         echo "⏱️  Preview will be available in 1-2 minutes!"
         echo "📱 Can be installed as PWA (Progressive Web App)"
         echo "🔖 Check manifest.json and icons for proper PWA support"
+    
+    # Step 15.5: Fix Kotlin version for Android build (VAOVAO!)
+    - name: Fix Kotlin version compatibility
+      run: |
+        echo "🔧 Fixing Kotlin version for Android build..."
+        
+        # Update settings.gradle (Flutter 3.19+)
+        if [ -f snake_game/android/settings.gradle ]; then
+          echo "Updating settings.gradle..."
+          sed -i "s/id \"org.jetbrains.kotlin.android\" version \".*\" apply false/id \"org.jetbrains.kotlin.android\" version \"1.9.24\" apply false/g" snake_game/android/settings.gradle
+          echo "✓ settings.gradle updated"
+        fi
+        
+        # Update build.gradle (Flutter < 3.19)
+        if [ -f snake_game/android/build.gradle ]; then
+          echo "Updating build.gradle..."
+          sed -i "s/ext.kotlin_version = '.*'/ext.kotlin_version = '1.9.24'/g" snake_game/android/build.gradle
+          echo "✓ build.gradle updated"
+        fi
+        
+        # Verify changes
+        echo ""
+        echo "📋 Verification:"
+        if [ -f snake_game/android/settings.gradle ]; then
+          echo "settings.gradle Kotlin version:"
+          grep "org.jetbrains.kotlin.android" snake_game/android/settings.gradle || echo "Not found in settings.gradle"
+        fi
+        if [ -f snake_game/android/build.gradle ]; then
+          echo "build.gradle Kotlin version:"
+          grep "kotlin_version" snake_game/android/build.gradle || echo "Not found in build.gradle"
+        fi
+        
+        echo "✓ Kotlin version fix completed"
     
     # Step 16: Build APK
     - name: Build APK
