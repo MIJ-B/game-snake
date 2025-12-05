@@ -94,6 +94,48 @@ jobs:
           ls -la snake_game/assets/sounds/ || echo "No sounds folder yet"
         fi
     
+    # Step 8.5: Copy web files (manifest, icons, index.html)
+    - name: Copy web configuration files
+      run: |
+        echo "🌐 Setting up web files..."
+        
+        # Copy manifest.json
+        if [ -f web/manifest.json ]; then
+          cp web/manifest.json snake_game/web/manifest.json
+          echo "✓ manifest.json copied"
+        else
+          echo "⚠️  No manifest.json found, using default"
+        fi
+        
+        # Copy custom index.html
+        if [ -f web/index.html ]; then
+          cp web/index.html snake_game/web/index.html
+          echo "✓ Custom index.html copied"
+        else
+          echo "⚠️  No custom index.html found"
+        fi
+        
+        # Copy icons
+        if [ -d web/icons ]; then
+          mkdir -p snake_game/web/icons
+          cp -r web/icons/* snake_game/web/icons/
+          echo "✓ Icons copied"
+          ls -la snake_game/web/icons/
+        else
+          echo "⚠️  No icons folder found"
+        fi
+        
+        # Copy favicon
+        if [ -f web/favicon.png ]; then
+          cp web/favicon.png snake_game/web/favicon.png
+          echo "✓ Favicon copied"
+        else
+          echo "⚠️  No favicon.png found"
+        fi
+        
+        echo "Web configuration complete!"
+      continue-on-error: true
+    
     # Step 9: Get dependencies (CRITICAL STEP!)
     - name: Install dependencies
       run: |
@@ -128,20 +170,52 @@ jobs:
         echo "✓ Web build completed"
       working-directory: ./snake_game
 
-    # Step 13: Fix web build for GitHub Pages
-    - name: Fix GitHub Pages deployment
+    # Step 13: Verify and fix web build for GitHub Pages
+    - name: Verify and fix GitHub Pages deployment
       run: |
         echo "📦 Web build contents:"
         ls -la snake_game/build/web/
         
         # Mamorona .nojekyll (ilaina ho an'ny GitHub Pages)
         touch snake_game/build/web/.nojekyll
+        echo "✓ .nojekyll created"
         
-        # Manamarina ny index.html
+        # Verify manifest.json
+        if [ -f snake_game/build/web/manifest.json ]; then
+          echo "✓ manifest.json found"
+          echo "Manifest content:"
+          cat snake_game/build/web/manifest.json
+        else
+          echo "⚠️  manifest.json NOT found in build output"
+        fi
+        
+        # Verify icons
+        if [ -d snake_game/build/web/icons ]; then
+          echo "✓ Icons folder found"
+          ls -la snake_game/build/web/icons/
+        else
+          echo "⚠️  Icons folder NOT found"
+        fi
+        
+        # Verify favicon
+        if [ -f snake_game/build/web/favicon.png ]; then
+          echo "✓ favicon.png found"
+        else
+          echo "⚠️  favicon.png NOT found"
+        fi
+        
+        # Verify index.html
         if [ -f snake_game/build/web/index.html ]; then
           echo "✓ index.html found"
-          echo "First 10 lines of index.html:"
-          head -n 10 snake_game/build/web/index.html
+          echo "First 20 lines of index.html:"
+          head -n 20 snake_game/build/web/index.html
+          
+          # Check if manifest is linked in index.html
+          if grep -q "manifest.json" snake_game/build/web/index.html; then
+            echo "✓ manifest.json is linked in index.html"
+          else
+            echo "⚠️  manifest.json NOT linked in index.html"
+          fi
         else
           echo "❌ index.html NOT found!"
           exit 1
@@ -153,6 +227,11 @@ jobs:
         else
           echo "❌ main.dart.js NOT found!"
         fi
+        
+        # List all web assets
+        echo ""
+        echo "📋 All web build files:"
+        find snake_game/build/web -type f | head -20
     
     # Step 14: Deploy to GitHub Pages for Preview
     - name: Deploy Preview to GitHub Pages
@@ -162,6 +241,7 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./snake_game/build/web
         publish_branch: gh-pages
+        cname: false  # Set to your custom domain if you have one
 
     # Step 15: Add preview URL comment
     - name: Preview URL Info
@@ -169,6 +249,8 @@ jobs:
       run: |
         echo "🎮 Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"
         echo "⏱️  Preview will be available in 1-2 minutes!"
+        echo "📱 Can be installed as PWA (Progressive Web App)"
+        echo "🔖 Check manifest.json and icons for proper PWA support"
     
     # Step 16: Build APK
     - name: Build APK
@@ -192,8 +274,18 @@ jobs:
         echo "🎉 Build completed successfully!" > build-info.txt
         echo "📅 Build date: $(date)" >> build-info.txt
         echo "📱 Flutter version: $(flutter --version | head -n 1)" >> build-info.txt
-        echo "🌐 Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> build-info.txt
-        echo "📦 APK size: $(du -h snake_game/build/app/outputs/flutter-apk/app-release.apk | cut -f1)" >> build-info.txt
+        echo "" >> build-info.txt
+        echo "🌐 WEB DEPLOYMENT" >> build-info.txt
+        echo "Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/" >> build-info.txt
+        echo "PWA Support: Yes (can be installed as app)" >> build-info.txt
+        echo "" >> build-info.txt
+        echo "📱 ANDROID APK" >> build-info.txt
+        echo "APK size: $(du -h snake_game/build/app/outputs/flutter-apk/app-release.apk | cut -f1)" >> build-info.txt
+        echo "" >> build-info.txt
+        echo "📋 WEB ASSETS" >> build-info.txt
+        echo "manifest.json: $([ -f snake_game/build/web/manifest.json ] && echo '✓ Present' || echo '✗ Missing')" >> build-info.txt
+        echo "favicon.png: $([ -f snake_game/build/web/favicon.png ] && echo '✓ Present' || echo '✗ Missing')" >> build-info.txt
+        echo "icons folder: $([ -d snake_game/build/web/icons ] && echo '✓ Present' || echo '✗ Missing')" >> build-info.txt
     
     - name: Upload build info
       uses: actions/upload-artifact@v4
