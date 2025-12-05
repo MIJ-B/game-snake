@@ -115,14 +115,14 @@ jobs:
           echo "⚠️  No custom index.html found"
         fi
         
-        # Copy icons
+        # Copy web icons
         if [ -d web/icons ]; then
           mkdir -p snake_game/web/icons
           cp -r web/icons/* snake_game/web/icons/
-          echo "✓ Icons copied"
+          echo "✓ Web icons copied"
           ls -la snake_game/web/icons/
         else
-          echo "⚠️  No icons folder found"
+          echo "⚠️  No web icons folder found"
         fi
         
         # Copy favicon
@@ -134,6 +134,89 @@ jobs:
         fi
         
         echo "Web configuration complete!"
+      continue-on-error: true
+    
+    # Step 8.6: Copy Android app icons (VAOVAO!)
+    - name: Copy Android app icons
+      run: |
+        echo "📱 Setting up Android app icons..."
+        
+        # Check raha misy android_icons folder
+        if [ -d android_icons ]; then
+          echo "✓ android_icons folder found"
+          
+          # Copy icons for each resolution
+          for resolution in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            if [ -d "android_icons/mipmap-${resolution}" ]; then
+              # Create target directory
+              mkdir -p "snake_game/android/app/src/main/res/mipmap-${resolution}"
+              
+              # Copy ic_launcher.png
+              if [ -f "android_icons/mipmap-${resolution}/ic_launcher.png" ]; then
+                cp -f "android_icons/mipmap-${resolution}/ic_launcher.png" \
+                      "snake_game/android/app/src/main/res/mipmap-${resolution}/ic_launcher.png"
+                echo "✓ Copied ${resolution} icon ($(du -h android_icons/mipmap-${resolution}/ic_launcher.png | cut -f1))"
+              else
+                echo "⚠️  ic_launcher.png not found in mipmap-${resolution}"
+              fi
+              
+              # Copy ic_launcher_round.png (raha misy)
+              if [ -f "android_icons/mipmap-${resolution}/ic_launcher_round.png" ]; then
+                cp -f "android_icons/mipmap-${resolution}/ic_launcher_round.png" \
+                      "snake_game/android/app/src/main/res/mipmap-${resolution}/ic_launcher_round.png"
+                echo "✓ Copied ${resolution} round icon"
+              fi
+              
+              # Copy ic_launcher_foreground.png (raha misy - adaptive icon)
+              if [ -f "android_icons/mipmap-${resolution}/ic_launcher_foreground.png" ]; then
+                cp -f "android_icons/mipmap-${resolution}/ic_launcher_foreground.png" \
+                      "snake_game/android/app/src/main/res/mipmap-${resolution}/ic_launcher_foreground.png"
+                echo "✓ Copied ${resolution} foreground icon"
+              fi
+            else
+              echo "⚠️  mipmap-${resolution} folder not found"
+            fi
+          done
+          
+          # Copy adaptive icon background (raha misy)
+          if [ -d "android_icons/values" ]; then
+            mkdir -p "snake_game/android/app/src/main/res/values"
+            if [ -f "android_icons/values/ic_launcher_background.xml" ]; then
+              cp -f "android_icons/values/ic_launcher_background.xml" \
+                    "snake_game/android/app/src/main/res/values/ic_launcher_background.xml"
+              echo "✓ Copied adaptive icon background XML"
+            fi
+          fi
+          
+          # Copy drawable resources (raha misy)
+          if [ -d "android_icons/drawable" ]; then
+            mkdir -p "snake_game/android/app/src/main/res/drawable"
+            cp -rf android_icons/drawable/* snake_game/android/app/src/main/res/drawable/
+            echo "✓ Copied drawable resources"
+          fi
+          
+          # Copy mipmap-anydpi (adaptive icon configs)
+          if [ -d "android_icons/mipmap-anydpi-v26" ]; then
+            mkdir -p "snake_game/android/app/src/main/res/mipmap-anydpi-v26"
+            cp -rf android_icons/mipmap-anydpi-v26/* snake_game/android/app/src/main/res/mipmap-anydpi-v26/
+            echo "✓ Copied adaptive icon configs"
+          fi
+          
+          # Verify icons
+          echo ""
+          echo "📋 Installed Android icons:"
+          find snake_game/android/app/src/main/res/mipmap-* -name "ic_launcher*.png" -exec ls -lh {} \; 2>/dev/null || echo "No icons found"
+          
+          # List all copied resources
+          echo ""
+          echo "📂 All Android icon resources:"
+          ls -la snake_game/android/app/src/main/res/mipmap-*/
+          
+          echo "✓ Android icons setup completed successfully!"
+        else
+          echo "⚠️  No android_icons folder found - using default Flutter icon"
+          echo "💡 To add custom icon: create 'android_icons/' folder with mipmap-* subfolders"
+        fi
       continue-on-error: true
     
     # Step 9: Get dependencies (CRITICAL STEP!)
@@ -247,7 +330,7 @@ jobs:
         echo "📱 Can be installed as PWA (Progressive Web App)"
         echo "🔖 Check manifest.json and icons for proper PWA support"
     
-    # Step 15.5: Fix Kotlin version for Android build (VAOVAO!)
+    # Step 15.5: Fix Kotlin version for Android build
     - name: Fix Kotlin version compatibility
       run: |
         echo "🔧 Fixing Kotlin version for Android build..."
@@ -314,6 +397,19 @@ jobs:
         echo "manifest.json: $([ -f snake_game/build/web/manifest.json ] && echo '✓ Present' || echo '✗ Missing')" >> build-info.txt
         echo "favicon.png: $([ -f snake_game/build/web/favicon.png ] && echo '✓ Present' || echo '✗ Missing')" >> build-info.txt
         echo "icons folder: $([ -d snake_game/build/web/icons ] && echo '✓ Present' || echo '✗ Missing')" >> build-info.txt
+        echo "" >> build-info.txt
+        echo "📱 ANDROID ICONS" >> build-info.txt
+        if [ -d android_icons ]; then
+          echo "Custom Android icons: ✓ Used" >> build-info.txt
+          echo "Icon resolutions:" >> build-info.txt
+          for res in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            if [ -f "android_icons/mipmap-${res}/ic_launcher.png" ]; then
+              echo "  - ${res}: ✓ ($(du -h android_icons/mipmap-${res}/ic_launcher.png | cut -f1))" >> build-info.txt
+            fi
+          done
+        else
+          echo "Custom Android icons: ✗ Using default" >> build-info.txt
+        fi
     
     - name: Upload build info
       uses: actions/upload-artifact@v4
